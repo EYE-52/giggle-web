@@ -4,8 +4,8 @@ const normalizeBaseUrl = (value: string | undefined, fallback: string): string =
 };
 
 export const BACKEND_API_BASE_URL = normalizeBaseUrl(
-  process.env.BACKEND_API_BASE_URL,
-  "http://localhost:3001"
+  process.env.NEXT_PUBLIC_BACKEND_API_BASE_URL,
+  "http://localhost:3001/api"
 );
 
 export const AUTH_EXCHANGE_ENDPOINT = `${BACKEND_API_BASE_URL}/api/auth/exchange`;
