@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import {
   createSquad,
@@ -22,6 +22,106 @@ type Props = {
   userName: string;
   userImage?: string | null;
 };
+
+type ActionIconButtonProps = {
+  label: string;
+  title?: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone: "indigo" | "slate" | "amber" | "cyan" | "emerald" | "rose";
+  icon: ReactNode;
+};
+
+const toneClassMap: Record<ActionIconButtonProps["tone"], string> = {
+  indigo: "bg-indigo-600 text-white",
+  slate: "bg-slate-200 text-slate-900",
+  amber: "bg-amber-500 text-white",
+  cyan: "bg-cyan-600 text-white",
+  emerald: "bg-emerald-600 text-white",
+  rose: "bg-rose-600 text-white",
+};
+
+function ActionIconButton({ label, title, onClick, disabled, tone, icon }: ActionIconButtonProps) {
+  return (
+    <button
+      className={`h-12 w-12 rounded-xl flex items-center justify-center disabled:opacity-50 ${toneClassMap[tone]}`}
+      onClick={onClick}
+      disabled={disabled}
+      title={title || label}
+      aria-label={label}
+    >
+      {icon}
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M5 12l5 5L20 7" />
+    </svg>
+  );
+}
+
+function VideoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="6" width="13" height="12" rx="2" />
+      <path d="M16 10l5-3v10l-5-3" />
+    </svg>
+  );
+}
+
+function VideoOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="6" width="13" height="12" rx="2" />
+      <path d="M16 10l5-3v10l-5-3" />
+      <path d="M4 4l16 16" />
+    </svg>
+  );
+}
+
+function MicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3" />
+    </svg>
+  );
+}
+
+function MicOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3" />
+      <path d="M4 4l16 16" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  );
+}
+
+function ExitIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10 17l-5-5 5-5" />
+      <path d="M5 12h10" />
+      <path d="M14 5h5v14h-5" />
+    </svg>
+  );
+}
 
 const hashStringToUid = (input: string): number => {
   let hash = 0;
@@ -90,6 +190,13 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     return map;
   }, [squad]);
 
+  const remoteUserSignature = useMemo(() => {
+    return remoteUsers
+      .map((user) => String(user.uid))
+      .sort()
+      .join("|");
+  }, [remoteUsers]);
+
   const refreshSquad = useCallback(
     async (squadId: string) => {
       const state = await getSquadById(backendToken, squadId);
@@ -121,6 +228,33 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
 
     void load();
   }, [backendToken]);
+
+  useEffect(() => {
+    if (!joined || !squad?.squadId) return;
+
+    let cancelled = false;
+
+    const syncSquad = async () => {
+      try {
+        const next = await getSquadById(backendToken, squad.squadId);
+        if (!cancelled) {
+          setSquad(next);
+        }
+      } catch {
+        // Keep lobby usable even if an occasional sync request fails.
+      }
+    };
+
+    void syncSquad();
+    const intervalId = setInterval(() => {
+      void syncSquad();
+    }, 4000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [backendToken, joined, remoteUserSignature, squad?.squadId]);
 
   const onCreateSquad = async () => {
     setLoading(true);
@@ -314,62 +448,75 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                 ))}
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className="rounded-lg bg-indigo-600 text-white px-4 py-2 disabled:opacity-50"
-                  onClick={onToggleReady}
-                  disabled={loading || !myMember}
-                >
-                  {myMember?.ready ? "Set Not Ready" : "Set Ready"}
-                </button>
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-3">
+                <div className="text-xs uppercase tracking-wide text-slate-500">Quick Controls</div>
+                <div className="flex flex-wrap gap-2">
+                  <ActionIconButton
+                    label={myMember?.ready ? "Set not ready" : "Set ready"}
+                    onClick={onToggleReady}
+                    disabled={loading || !myMember}
+                    tone="indigo"
+                    icon={<CheckIcon />}
+                  />
 
-                <button
-                  className="rounded-lg bg-slate-900 text-white px-4 py-2 disabled:opacity-50"
-                  onClick={onJoinLobbyVideo}
-                  disabled={joiningAgora || joined}
-                >
-                  {joined ? "Lobby Connected" : "Join Lobby Video"}
-                </button>
+                  <ActionIconButton
+                    label={joined ? "Lobby connected" : "Join lobby video"}
+                    onClick={onJoinLobbyVideo}
+                    disabled={joiningAgora || joined}
+                    tone="indigo"
+                    icon={<VideoIcon />}
+                  />
 
-                <button
-                  className="rounded-lg bg-slate-200 text-slate-900 px-4 py-2 disabled:opacity-50"
-                  onClick={() => leaveLobby()}
-                  disabled={!joined}
-                >
-                  Leave Video
-                </button>
+                  <ActionIconButton
+                    label="Leave video lobby"
+                    onClick={() => leaveLobby()}
+                    disabled={!joined}
+                    tone="slate"
+                    icon={<ExitIcon />}
+                  />
 
-                <button
-                  className="rounded-lg bg-amber-500 text-white px-4 py-2 disabled:opacity-50"
-                  onClick={() => toggleMic()}
-                  disabled={!joined}
-                >
-                  {isMicOn ? "Mic Off" : "Mic On"}
-                </button>
+                  <ActionIconButton
+                    label={isMicOn ? "Mute microphone" : "Unmute microphone"}
+                    onClick={() => toggleMic()}
+                    disabled={!joined}
+                    tone="amber"
+                    icon={isMicOn ? <MicOffIcon /> : <MicIcon />}
+                  />
 
-                <button
-                  className="rounded-lg bg-cyan-600 text-white px-4 py-2 disabled:opacity-50"
-                  onClick={() => toggleVideo()}
-                  disabled={!joined}
-                >
-                  {isVideoOn ? "Video Off" : "Video On"}
-                </button>
+                  <ActionIconButton
+                    label={isVideoOn ? "Turn camera off" : "Turn camera on"}
+                    onClick={() => toggleVideo()}
+                    disabled={!joined}
+                    tone="cyan"
+                    icon={isVideoOn ? <VideoOffIcon /> : <VideoIcon />}
+                  />
 
-                <button
-                  className="rounded-lg bg-emerald-600 text-white px-4 py-2 disabled:opacity-50"
-                  onClick={onStartSearch}
-                  disabled={loading || !isLeader || !allReady || squad.status !== "idle"}
-                >
-                  Start Matchmaking (Leader)
-                </button>
+                  {isLeader ? (
+                    <ActionIconButton
+                      label="Start matchmaking"
+                      title={
+                        allReady && squad.status === "idle"
+                          ? "Start matchmaking"
+                          : "Everyone must be ready and squad must be idle"
+                      }
+                      onClick={onStartSearch}
+                      disabled={loading || !allReady || squad.status !== "idle"}
+                      tone="emerald"
+                      icon={<SearchIcon />}
+                    />
+                  ) : null}
 
-                <button
-                  className="rounded-lg bg-rose-600 text-white px-4 py-2 disabled:opacity-50"
-                  onClick={onLeaveSquad}
-                  disabled={loading}
-                >
-                  Leave Squad
-                </button>
+                  <ActionIconButton
+                    label="Leave squad"
+                    onClick={onLeaveSquad}
+                    disabled={loading}
+                    tone="rose"
+                    icon={<ExitIcon />}
+                  />
+                </div>
+                <div className="text-xs text-slate-500">
+                  Hover an icon to see action name. {isLeader ? "Matchmaking is leader-only." : "Leader controls are hidden for members."}
+                </div>
               </div>
             </section>
 
