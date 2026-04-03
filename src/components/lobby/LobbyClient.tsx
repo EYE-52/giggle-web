@@ -15,7 +15,7 @@ import {
 import { BackendApiError } from "@/lib/api/client";
 import type { SquadState } from "@/types/giggle";
 import { useSquadLobbyAgora } from "@/lib/agora/useSquadLobbyAgora";
-import { VideoTile } from "@/components/lobby/VideoTile";
+import { CameraStateIcon, MicStateIcon, VideoTile } from "@/components/lobby/VideoTile";
 
 type Props = {
   backendToken: string;
@@ -60,46 +60,6 @@ function CheckIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M5 12l5 5L20 7" />
-    </svg>
-  );
-}
-
-function VideoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="6" width="13" height="12" rx="2" />
-      <path d="M16 10l5-3v10l-5-3" />
-    </svg>
-  );
-}
-
-function VideoOffIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="6" width="13" height="12" rx="2" />
-      <path d="M16 10l5-3v10l-5-3" />
-      <path d="M4 4l16 16" />
-    </svg>
-  );
-}
-
-function MicIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5 11a7 7 0 0 0 14 0" />
-      <path d="M12 18v3" />
-    </svg>
-  );
-}
-
-function MicOffIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5 11a7 7 0 0 0 14 0" />
-      <path d="M12 18v3" />
-      <path d="M4 4l16 16" />
     </svg>
   );
 }
@@ -189,6 +149,35 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
 
     return map;
   }, [squad]);
+
+  const remoteUsersByUid = useMemo(() => {
+    return new Map(remoteUsers.map((user) => [Number(user.uid), user]));
+  }, [remoteUsers]);
+
+  const videoTiles = useMemo(() => {
+    if (!squad) return [];
+
+    return (squad.members || []).map((member) => {
+      const uid = hashStringToUid(`${squad.squadId}:${member.userId}`);
+      const isSelf = member.memberId === myMember?.memberId;
+      const remoteUser = remoteUsersByUid.get(uid);
+      const track = isSelf ? localVideoTrack : remoteUser?.videoTrack || null;
+      const micOn = isSelf ? Boolean(joined && isMicOn) : Boolean(remoteUser?.audioTrack);
+      const showVideo = isSelf ? Boolean(localVideoTrack && isVideoOn) : Boolean(remoteUser?.videoTrack);
+      const presence = isSelf ? (joined ? "In video lobby" : "Not in video lobby") : remoteUser ? "In video lobby" : "Not in video lobby";
+
+      return {
+        key: member.memberId,
+        label: member.displayName || uidToDisplayName.get(uid) || member.userId,
+        role: member.role,
+        ready: member.ready,
+        presence,
+        micOn,
+        track,
+        showVideo,
+      };
+    });
+  }, [isMicOn, isVideoOn, joined, localVideoTrack, myMember?.memberId, remoteUsersByUid, squad, uidToDisplayName]);
 
   const remoteUserSignature = useMemo(() => {
     return remoteUsers
@@ -436,18 +425,6 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                 Invite code: <span className="font-semibold">{squad.squadCode}</span>
               </div>
 
-              <div className="grid gap-2 md:grid-cols-2">
-                {(squad.members || []).map((member) => (
-                  <div key={member.memberId} className="rounded-lg border border-slate-200 p-3 text-sm">
-                    <div className="font-medium">{member.displayName || member.userId}</div>
-                    <div className="text-slate-500">Role: {member.role}</div>
-                    <div className={member.ready ? "text-emerald-700" : "text-amber-700"}>
-                      {member.ready ? "Ready" : "Not ready"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
               <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-3">
                 <div className="text-xs uppercase tracking-wide text-slate-500">Quick Controls</div>
                 <div className="flex flex-wrap gap-2">
@@ -464,7 +441,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     onClick={onJoinLobbyVideo}
                     disabled={joiningAgora || joined}
                     tone="indigo"
-                    icon={<VideoIcon />}
+                    icon={<CameraStateIcon enabled className="h-6 w-6" />}
                   />
 
                   <ActionIconButton
@@ -472,7 +449,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     onClick={() => leaveLobby()}
                     disabled={!joined}
                     tone="slate"
-                    icon={<ExitIcon />}
+                    icon={<CameraStateIcon enabled={false} className="h-6 w-6" />}
                   />
 
                   <ActionIconButton
@@ -480,7 +457,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     onClick={() => toggleMic()}
                     disabled={!joined}
                     tone="amber"
-                    icon={isMicOn ? <MicOffIcon /> : <MicIcon />}
+                    icon={<MicStateIcon enabled={isMicOn} className="h-6 w-6" />}
                   />
 
                   <ActionIconButton
@@ -488,7 +465,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     onClick={() => toggleVideo()}
                     disabled={!joined}
                     tone="cyan"
-                    icon={isVideoOn ? <VideoOffIcon /> : <VideoIcon />}
+                    icon={<CameraStateIcon enabled={isVideoOn} className="h-6 w-6" />}
                   />
 
                   {isLeader ? (
@@ -527,12 +504,16 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                <VideoTile label="You" track={localVideoTrack} />
-                {remoteUsers.map((user) => (
+                {videoTiles.map((tile) => (
                   <VideoTile
-                    key={String(user.uid)}
-                    label={uidToDisplayName.get(Number(user.uid)) || `Member ${user.uid}`}
-                    track={user.videoTrack || null}
+                    key={tile.key}
+                    label={tile.label}
+                    role={tile.role}
+                    ready={tile.ready}
+                    presence={tile.presence}
+                    micOn={tile.micOn}
+                    track={tile.track}
+                    showVideo={tile.showVideo}
                   />
                 ))}
               </div>
