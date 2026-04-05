@@ -500,22 +500,60 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
             <section className="rounded-2xl bg-white border border-slate-200 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-semibold">Video Lobby</h3>
-                <span className="text-sm text-slate-500">Participants: {participantsCount}</span>
+                <div className="flex items-center gap-3 text-sm text-slate-500">
+                  <span>Squad: {squad.members?.length ?? 0}</span>
+                  <span className="text-slate-300">|</span>
+                  <span>In video: {participantsCount}</span>
+                </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                {videoTiles.map((tile) => (
-                  <VideoTile
-                    key={tile.key}
-                    label={tile.label}
-                    role={tile.role}
-                    ready={tile.ready}
-                    presence={tile.presence}
-                    micOn={tile.micOn}
-                    track={tile.track}
-                    showVideo={tile.showVideo}
-                  />
-                ))}
+              <div className="flex gap-4">
+                {/* Left: video tiles for members currently in video lobby */}
+                <div className="flex-1 min-w-0">
+                  {videoTiles.filter((t) => t.presence === "In video lobby").length === 0 ? (
+                    <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 h-40 text-sm text-slate-400">
+                      No one is in the video lobby yet
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {videoTiles
+                        .filter((t) => t.presence === "In video lobby")
+                        .map((tile) => (
+                          <VideoTile
+                            key={tile.key}
+                            label={tile.label}
+                            role={tile.role}
+                            ready={tile.ready}
+                            presence={tile.presence}
+                            micOn={tile.micOn}
+                            track={tile.track}
+                            showVideo={tile.showVideo}
+                          />
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: all squad members roster */}
+                <div className="w-52 shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1">
+                  <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">Squad Members</div>
+                  {(squad.members ?? []).map((member) => {
+                    const tile = videoTiles.find((t) => t.key === member.memberId);
+                    const inVideo = tile?.presence === "In video lobby";
+                    return (
+                      <div key={member.memberId} className="flex items-center gap-2 rounded-lg px-2 py-1.5 bg-white border border-slate-200">
+                        <span
+                          className={`h-2 w-2 rounded-full shrink-0 ${inVideo ? "bg-emerald-500" : "bg-slate-300"}`}
+                          title={inVideo ? "In video lobby" : "Not in video lobby"}
+                        />
+                        <span className="text-sm font-medium truncate flex-1">{member.displayName || member.userId}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${member.role === "leader" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600"}`}>
+                          {member.role}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </section>
           </>

@@ -103,7 +103,6 @@ export const useSquadLobbyAgora = () => {
 
     setLocalAudioTrack(null);
     setLocalVideoTrack(null);
-    setRemoteUsers([]);
     setIsMicOn(true);
     setIsVideoOn(true);
     setJoined(false);
