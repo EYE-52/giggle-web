@@ -100,9 +100,11 @@ export function VideoTile({ label, track, role, ready, presence, micOn, showVide
         <div className="font-medium">{label}</div>
         <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-200">
           {role ? <span className="rounded-full bg-white/10 px-2 py-1">{role}</span> : null}
-          <span className={`rounded-full px-2 py-1 ${ready ? "bg-emerald-500/30 text-emerald-100" : "bg-amber-500/30 text-amber-100"}`}>
-            {ready ? "Ready" : "Not ready"}
-          </span>
+          {typeof ready === "boolean" ? (
+            <span className={`rounded-full px-2 py-1 ${ready ? "bg-emerald-500/30 text-emerald-100" : "bg-amber-500/30 text-amber-100"}`}>
+              {ready ? "Ready" : "Not ready"}
+            </span>
+          ) : null}
           {presence ? <span className="rounded-full bg-white/10 px-2 py-1">{presence}</span> : null}
         </div>
       </div>

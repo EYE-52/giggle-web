@@ -1,19 +1,29 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import {
+  acknowledgeEncounter,
+  cancelSearch,
   createSquad,
+  disconnectEncounter,
+  getEncounterHandoffStatus,
+  getEncounterToken,
   getLobbyToken,
+  getMatchmakingStatus,
   getMySquad,
   getSquadById,
+  kickMember,
   joinSquad,
   leaveSquad,
+  promoteMember,
   setReadyState,
+  skipEncounter,
   startSearch,
+  updateSquadName,
 } from "@/lib/api/squad";
 import { BackendApiError } from "@/lib/api/client";
-import type { SquadState } from "@/types/giggle";
+import type { EncounterHandoffResponse, MatchmakingStatusResponse, SquadState } from "@/types/giggle";
 import { useSquadLobbyAgora } from "@/lib/agora/useSquadLobbyAgora";
 import { CameraStateIcon, MicStateIcon, VideoTile } from "@/components/lobby/VideoTile";
 
@@ -83,6 +93,24 @@ function ExitIcon() {
   );
 }
 
+function SkipIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M5 5l7 7-7 7" />
+      <path d="M13 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function DisconnectIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
 const hashStringToUid = (input: string): number => {
   let hash = 0;
   for (let i = 0; i < input.length; i += 1) {
@@ -96,6 +124,7 @@ const hashStringToUid = (input: string): number => {
 const toSquadState = (data: {
   squadId: string;
   squadCode: string;
+  squadName: string;
   status: SquadState["status"];
   members: SquadState["members"];
   leaderMemberId?: string | null;
@@ -103,6 +132,7 @@ const toSquadState = (data: {
   return {
     squadId: data.squadId,
     squadCode: data.squadCode,
+    squadName: data.squadName,
     status: data.status,
     members: data.members,
     leaderMemberId: data.leaderMemberId || undefined,
@@ -111,14 +141,18 @@ const toSquadState = (data: {
 
 export function LobbyClient({ backendToken, userName, userImage }: Props) {
   const [displayName, setDisplayName] = useState(userName || "");
+  const [newSquadName, setNewSquadName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [squad, setSquad] = useState<SquadState | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [joiningAgora, setJoiningAgora] = useState(false);
+  const [matchStatus, setMatchStatus] = useState<MatchmakingStatusResponse | null>(null);
+  const [handoffStatus, setHandoffStatus] = useState<EncounterHandoffResponse | null>(null);
 
   const {
     joined,
+    currentChannelName,
     localVideoTrack,
     remoteUsers,
     participantsCount,
@@ -137,34 +171,42 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
 
   const isLeader = myMember?.role === "leader";
   const allReady = squad && squad.members && squad.members.length > 0 && squad.members.every((member) => member.ready);
+  const autoJoinedEncounterRef = useRef<string | null>(null);
+  const encounterId = matchStatus?.match?.encounterId || null;
+  const isInEncounterChannel = Boolean(joined && currentChannelName?.startsWith("encounter_"));
+  const uidScope = isInEncounterChannel && encounterId ? encounterId : squad?.squadId;
 
   const uidToDisplayName = useMemo(() => {
     const map = new Map<number, string>();
-    if (!squad) return map;
+    if (!squad || !uidScope) return map;
 
     for (const member of squad.members || []) {
-      const uid = hashStringToUid(`${squad.squadId}:${member.userId}`);
+      const uid = hashStringToUid(`${uidScope}:${member.userId}`);
       map.set(uid, member.displayName || member.userId);
     }
 
     return map;
-  }, [squad]);
+  }, [squad, uidScope]);
 
   const remoteUsersByUid = useMemo(() => {
     return new Map(remoteUsers.map((user) => [Number(user.uid), user]));
   }, [remoteUsers]);
 
   const videoTiles = useMemo(() => {
-    if (!squad) return [];
+    if (!squad || !uidScope) return [];
 
-    return (squad.members || []).map((member) => {
-      const uid = hashStringToUid(`${squad.squadId}:${member.userId}`);
+    const knownUids = new Set<number>();
+    const squadTiles = (squad.members || []).map((member) => {
+      const uid = hashStringToUid(`${uidScope}:${member.userId}`);
+      knownUids.add(uid);
       const isSelf = member.memberId === myMember?.memberId;
       const remoteUser = remoteUsersByUid.get(uid);
       const track = isSelf ? localVideoTrack : remoteUser?.videoTrack || null;
       const micOn = isSelf ? Boolean(joined && isMicOn) : Boolean(remoteUser?.audioTrack);
       const showVideo = isSelf ? Boolean(localVideoTrack && isVideoOn) : Boolean(remoteUser?.videoTrack);
-      const presence = isSelf ? (joined ? "In video lobby" : "Not in video lobby") : remoteUser ? "In video lobby" : "Not in video lobby";
+      const onlineText = isInEncounterChannel ? "In encounter room" : "In video lobby";
+      const offlineText = isInEncounterChannel ? "Not in encounter room" : "Not in video lobby";
+      const presence = isSelf ? (joined ? onlineText : offlineText) : remoteUser ? onlineText : offlineText;
 
       return {
         key: member.memberId,
@@ -177,7 +219,111 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
         showVideo,
       };
     });
-  }, [isMicOn, isVideoOn, joined, localVideoTrack, myMember?.memberId, remoteUsersByUid, squad, uidToDisplayName]);
+
+    if (!isInEncounterChannel) {
+      return squadTiles;
+    }
+
+    const opponentTiles = remoteUsers
+      .filter((remoteUser) => !knownUids.has(Number(remoteUser.uid)))
+      .map((remoteUser) => {
+        const numericUid = Number(remoteUser.uid);
+        return {
+          key: `encounter-${numericUid}`,
+          label: `Encounter participant ${String(numericUid).slice(-4)}`,
+          role: "member",
+          ready: undefined,
+          presence: "In encounter room",
+          micOn: Boolean(remoteUser.audioTrack),
+          track: remoteUser.videoTrack || null,
+          showVideo: Boolean(remoteUser.videoTrack),
+        };
+      });
+
+    return [...squadTiles, ...opponentTiles];
+  }, [
+    isInEncounterChannel,
+    isMicOn,
+    isVideoOn,
+    joined,
+    localVideoTrack,
+    myMember?.memberId,
+    remoteUsers,
+    remoteUsersByUid,
+    squad,
+    uidScope,
+    uidToDisplayName,
+  ]);
+
+  const encounterSplitTiles = useMemo(() => {
+    if (!squad || !uidScope) {
+      return { ownSquadTiles: [], opponentSquadTiles: [] };
+    }
+
+    const knownUids = new Set<number>();
+    const ownSquadTiles = (squad.members || []).map((member) => {
+      const uid = hashStringToUid(`${uidScope}:${member.userId}`);
+      knownUids.add(uid);
+      const isSelf = member.memberId === myMember?.memberId;
+      const remoteUser = remoteUsersByUid.get(uid);
+      const track = isSelf ? localVideoTrack : remoteUser?.videoTrack || null;
+      const micOn = isSelf ? Boolean(joined && isMicOn) : Boolean(remoteUser?.audioTrack);
+      const showVideo = isSelf ? Boolean(localVideoTrack && isVideoOn) : Boolean(remoteUser?.videoTrack);
+      const onlineText = isInEncounterChannel ? "In encounter room" : "In video lobby";
+      const offlineText = isInEncounterChannel ? "Not in encounter room" : "Not in video lobby";
+      const presence = isSelf ? (joined ? onlineText : offlineText) : remoteUser ? onlineText : offlineText;
+
+      return {
+        key: member.memberId,
+        label: member.displayName || uidToDisplayName.get(uid) || member.userId,
+        role: member.role,
+        ready: member.ready,
+        presence,
+        micOn,
+        track,
+        showVideo,
+      };
+    });
+
+    const opponentSquadTiles = remoteUsers
+      .filter((remoteUser) => !knownUids.has(Number(remoteUser.uid)))
+      .map((remoteUser) => {
+        const numericUid = Number(remoteUser.uid);
+        return {
+          key: `encounter-${numericUid}`,
+          label: `Encounter participant ${String(numericUid).slice(-4)}`,
+          role: "member",
+          ready: undefined,
+          presence: "In encounter room",
+          micOn: Boolean(remoteUser.audioTrack),
+          track: remoteUser.videoTrack || null,
+          showVideo: Boolean(remoteUser.videoTrack),
+        };
+      });
+
+    return { ownSquadTiles, opponentSquadTiles };
+  }, [
+    isInEncounterChannel,
+    isMicOn,
+    isVideoOn,
+    joined,
+    localVideoTrack,
+    myMember?.memberId,
+    remoteUsers,
+    remoteUsersByUid,
+    squad,
+    uidScope,
+    uidToDisplayName,
+  ]);
+
+  const ownEncounterSquadName = matchStatus?.match?.ownSquadName || squad?.squadName || "Your squad";
+  const opponentEncounterSquadName =
+    matchStatus?.match?.opponentSquadName ||
+    (handoffStatus
+      ? handoffStatus.squadAId === squad?.squadId
+        ? handoffStatus.squadBName
+        : handoffStatus.squadAName
+      : "Opponent squad");
 
   const remoteUserSignature = useMemo(() => {
     return remoteUsers
@@ -204,6 +350,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
           toSquadState({
             squadId: result.squadId,
             squadCode: result.squadCode || "",
+            squadName: result.squadName || "Unnamed squad",
             status: result.status || "idle",
             members: result.members || [],
             leaderMemberId: result.leaderMemberId || undefined,
@@ -217,6 +364,49 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
 
     void load();
   }, [backendToken]);
+
+  useEffect(() => {
+    if (!squad?.squadId) {
+      setMatchStatus(null);
+      setHandoffStatus(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const refreshMatchStatus = async () => {
+      try {
+        const status = await getMatchmakingStatus(backendToken, squad.squadId);
+        if (cancelled) return;
+        setMatchStatus(status);
+
+        const activeEncounterId = status.match?.encounterId;
+        if (activeEncounterId) {
+          const handoff = await getEncounterHandoffStatus(backendToken, activeEncounterId);
+          if (!cancelled) {
+            setHandoffStatus(handoff);
+          }
+        } else if (!cancelled) {
+          setHandoffStatus(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setMatchStatus(null);
+          setHandoffStatus(null);
+        }
+      }
+    };
+
+    void refreshMatchStatus();
+    const intervalId = setInterval(() => {
+      void refreshMatchStatus();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [backendToken, squad?.squadId]);
 
   useEffect(() => {
     if (!joined || !squad?.squadId) return;
@@ -245,6 +435,55 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     };
   }, [backendToken, joined, remoteUserSignature, squad?.squadId]);
 
+  useEffect(() => {
+    if (!encounterId || !squad || joiningAgora) return;
+    if (handoffStatus?.status !== "active" || squad.status !== "in_encounter") return;
+
+    const expectedChannel = `encounter_${encounterId}`;
+    if (joined && currentChannelName === expectedChannel) {
+      return;
+    }
+
+    if (autoJoinedEncounterRef.current === encounterId) {
+      return;
+    }
+
+    autoJoinedEncounterRef.current = encounterId;
+
+    const autoJoinEncounter = async () => {
+      setJoiningAgora(true);
+      setMessage("Encounter is active. Joining common encounter room...");
+      try {
+        await leaveLobby();
+        const tokenData = await getEncounterToken(backendToken, squad.squadId, encounterId);
+        await joinLobby({
+          appId: tokenData.appId,
+          channelName: tokenData.channelName,
+          token: tokenData.rtcToken,
+          uid: tokenData.uid,
+        });
+        setMessage("Joined encounter video.");
+      } catch (error) {
+        const err = error as BackendApiError;
+        setMessage(err.message || "Failed to auto-join encounter video");
+      } finally {
+        setJoiningAgora(false);
+      }
+    };
+
+    void autoJoinEncounter();
+  }, [
+    backendToken,
+    currentChannelName,
+    encounterId,
+    handoffStatus?.status,
+    joinLobby,
+    joined,
+    joiningAgora,
+    leaveLobby,
+    squad,
+  ]);
+
   const onCreateSquad = async () => {
     setLoading(true);
     setMessage(null);
@@ -255,6 +494,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
         toSquadState({
           squadId: data.squadId,
           squadCode: data.squadCode,
+          squadName: data.squadName,
           status: data.status,
           members: data.members,
         })
@@ -278,6 +518,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
         toSquadState({
           squadId: data.squadId,
           squadCode: data.squadCode,
+          squadName: data.squadName,
           status: data.status,
           members: data.members,
         })
@@ -306,6 +547,29 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     }
   };
 
+  const onUpdateSquadName = async () => {
+    if (!squad || !isLeader) return;
+
+    const normalized = newSquadName.trim();
+    if (!normalized) {
+      setMessage("Squad name cannot be empty.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await updateSquadName(backendToken, squad.squadId, normalized);
+      await refreshSquad(squad.squadId);
+      setNewSquadName("");
+      setMessage("Squad name updated.");
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onStartSearch = async () => {
     if (!squad) return;
     setLoading(true);
@@ -314,6 +578,54 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
       await startSearch(backendToken, squad.squadId);
       await refreshSquad(squad.squadId);
       setMessage("Matchmaking started. In Phase 1 this is state-only.");
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onCancelSearch = async () => {
+    if (!squad) return;
+    setLoading(true);
+
+    try {
+      await cancelSearch(backendToken, squad.squadId);
+      await refreshSquad(squad.squadId);
+      setMessage("Matchmaking canceled.");
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onKickMember = async (memberId: string) => {
+    if (!squad) return;
+    setLoading(true);
+
+    try {
+      await kickMember(backendToken, squad.squadId, memberId);
+      await refreshSquad(squad.squadId);
+      setMessage("Member removed from squad.");
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onPromoteMember = async (memberId: string) => {
+    if (!squad) return;
+    setLoading(true);
+
+    try {
+      await promoteMember(backendToken, squad.squadId, memberId);
+      await refreshSquad(squad.squadId);
+      setMessage("Leadership transferred.");
     } catch (error) {
       const err = error as BackendApiError;
       setMessage(err.message);
@@ -358,6 +670,87 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
       setMessage(err.message || "Failed to join lobby video");
     } finally {
       setJoiningAgora(false);
+    }
+  };
+
+  const onAcknowledgeEncounter = async () => {
+    if (!squad || !encounterId) return;
+    setLoading(true);
+
+    try {
+      await acknowledgeEncounter(backendToken, encounterId, squad.squadId);
+      setMessage("Encounter acknowledged.");
+      const handoff = await getEncounterHandoffStatus(backendToken, encounterId);
+      setHandoffStatus(handoff);
+      const status = await getMatchmakingStatus(backendToken, squad.squadId);
+      setMatchStatus(status);
+      await refreshSquad(squad.squadId);
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onJoinEncounterVideo = async () => {
+    if (!squad || !encounterId) return;
+    setJoiningAgora(true);
+
+    try {
+      await leaveLobby();
+      const tokenData = await getEncounterToken(backendToken, squad.squadId, encounterId);
+      await joinLobby({
+        appId: tokenData.appId,
+        channelName: tokenData.channelName,
+        token: tokenData.rtcToken,
+        uid: tokenData.uid,
+      });
+      setMessage("Joined encounter video.");
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message || "Failed to join encounter video");
+    } finally {
+      setJoiningAgora(false);
+    }
+  };
+
+  const onDisconnectEncounter = async () => {
+    if (!squad || !encounterId) return;
+    setLoading(true);
+
+    try {
+      await disconnectEncounter(backendToken, squad.squadId, encounterId);
+      await leaveLobby();
+      await refreshSquad(squad.squadId);
+      setMatchStatus(null);
+      setHandoffStatus(null);
+      setMessage("Disconnected from encounter.");
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSkipEncounter = async () => {
+    if (!squad || !encounterId) return;
+    setLoading(true);
+
+    try {
+      await skipEncounter(backendToken, squad.squadId, encounterId);
+      await leaveLobby();
+      await refreshSquad(squad.squadId);
+      const status = await getMatchmakingStatus(backendToken, squad.squadId);
+      setMatchStatus(status);
+      setHandoffStatus(null);
+      setMessage("Encounter skipped. Requeued for matchmaking.");
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -422,8 +815,48 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
               </div>
 
               <div className="text-sm">
+                Squad name: <span className="font-semibold">{squad.squadName}</span>
+              </div>
+
+              <div className="text-sm">
                 Invite code: <span className="font-semibold">{squad.squadCode}</span>
               </div>
+
+              <div className="text-xs text-slate-600 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                Match state: <span className="font-medium">{matchStatus?.state || squad.status}</span>
+                {matchStatus?.queue ? ` | Queue wait: ${matchStatus.queue.waitSeconds}s` : ""}
+                {encounterId ? ` | Encounter: ${encounterId}` : ""}
+              </div>
+
+              {encounterId && matchStatus?.match ? (
+                <div className="text-xs text-slate-700 rounded-lg border border-cyan-200 bg-cyan-50 p-2">
+                  Encounter room: <span className="font-semibold">{matchStatus.match.ownSquadName}</span>
+                  {" vs "}
+                  <span className="font-semibold">{matchStatus.match.opponentSquadName}</span>
+                </div>
+              ) : null}
+
+              {isLeader ? (
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
+                  <div className="text-xs uppercase tracking-wide text-slate-500">Squad Name</div>
+                  <div className="flex gap-2">
+                    <input
+                      className="flex-1 rounded-lg border border-slate-300 p-2 text-sm"
+                      value={newSquadName}
+                      onChange={(e) => setNewSquadName(e.target.value)}
+                      placeholder={squad.squadName}
+                      maxLength={32}
+                    />
+                    <button
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-50"
+                      onClick={onUpdateSquadName}
+                      disabled={loading || newSquadName.trim().length < 2}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-3">
                 <div className="text-xs uppercase tracking-wide text-slate-500">Quick Controls</div>
@@ -437,19 +870,11 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                   />
 
                   <ActionIconButton
-                    label={joined ? "Lobby connected" : "Join lobby video"}
-                    onClick={onJoinLobbyVideo}
-                    disabled={joiningAgora || joined}
-                    tone="indigo"
-                    icon={<CameraStateIcon enabled className="h-6 w-6" />}
-                  />
-
-                  <ActionIconButton
-                    label="Leave video lobby"
-                    onClick={() => leaveLobby()}
-                    disabled={!joined}
-                    tone="slate"
-                    icon={<CameraStateIcon enabled={false} className="h-6 w-6" />}
+                    label={joined ? "Leave video lobby" : "Join lobby video"}
+                    onClick={joined ? () => leaveLobby() : onJoinLobbyVideo}
+                    disabled={joiningAgora || (joined && undefined) || (!joined && undefined)}
+                    tone={joined ? "slate" : "indigo"}
+                    icon={<CameraStateIcon enabled={joined} className="h-6 w-6" />}
                   />
 
                   <ActionIconButton
@@ -468,18 +893,68 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     icon={<CameraStateIcon enabled={isVideoOn} className="h-6 w-6" />}
                   />
 
-                  {isLeader ? (
+                  {isLeader && squad.status === "idle" ? (
                     <ActionIconButton
                       label="Start matchmaking"
                       title={
-                        allReady && squad.status === "idle"
+                        allReady
                           ? "Start matchmaking"
-                          : "Everyone must be ready and squad must be idle"
+                          : "Everyone must be ready"
                       }
                       onClick={onStartSearch}
-                      disabled={loading || !allReady || squad.status !== "idle"}
+                      disabled={loading || !allReady}
                       tone="emerald"
                       icon={<SearchIcon />}
+                    />
+                  ) : null}
+
+                  {isLeader && squad.status === "searching" ? (
+                    <ActionIconButton
+                      label="Cancel matchmaking"
+                      onClick={onCancelSearch}
+                      disabled={loading}
+                      tone="slate"
+                      icon={<SearchIcon />}
+                    />
+                  ) : null}
+
+                  {encounterId && squad.status === "matched" ? (
+                    <ActionIconButton
+                      label="Acknowledge encounter"
+                      onClick={onAcknowledgeEncounter}
+                      disabled={loading}
+                      tone="emerald"
+                      icon={<CheckIcon />}
+                    />
+                  ) : null}
+
+                  {encounterId && squad.status !== "idle" ? (
+                    <ActionIconButton
+                      label="Join encounter video"
+                      onClick={onJoinEncounterVideo}
+                      disabled={joiningAgora}
+                      tone="cyan"
+                      icon={<CameraStateIcon enabled className="h-6 w-6" />}
+                    />
+                  ) : null}
+
+                  {encounterId ? (
+                    <ActionIconButton
+                      label="Disconnect encounter"
+                      onClick={onDisconnectEncounter}
+                      disabled={loading}
+                      tone="rose"
+                      icon={<DisconnectIcon />}
+                    />
+                  ) : null}
+
+                  {isLeader && encounterId ? (
+                    <ActionIconButton
+                      label="Skip encounter"
+                      onClick={onSkipEncounter}
+                      disabled={loading}
+                      tone="rose"
+                      icon={<SkipIcon />}
                     />
                   ) : null}
 
@@ -492,31 +967,118 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                   />
                 </div>
                 <div className="text-xs text-slate-500">
-                  Hover an icon to see action name. {isLeader ? "Matchmaking is leader-only." : "Leader controls are hidden for members."}
+                  Hover an icon to see action name. {isLeader ? "Matchmaking is leader-only." : ""}
                 </div>
               </div>
+
+              {isLeader ? (
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
+                  <div className="text-xs uppercase tracking-wide text-slate-500">Member Management</div>
+                  <div className="grid gap-2">
+                    {(squad.members || []).map((member) => {
+                      const isMe = member.memberId === myMember?.memberId;
+                      return (
+                        <div key={member.memberId} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                          <div>
+                            <div className="font-medium">{member.displayName || member.userId}</div>
+                            <div className="text-slate-500">{member.role}</div>
+                          </div>
+                          <div className="flex gap-2">
+                            {member.role !== "leader" ? (
+                              <>
+                                <button
+                                  className="rounded-md bg-indigo-600 px-2 py-1 text-white disabled:opacity-50"
+                                  onClick={() => onPromoteMember(member.memberId)}
+                                  disabled={loading || isMe}
+                                >
+                                  Promote
+                                </button>
+                                <button
+                                  className="rounded-md bg-rose-600 px-2 py-1 text-white disabled:opacity-50"
+                                  onClick={() => onKickMember(member.memberId)}
+                                  disabled={loading || isMe}
+                                >
+                                  Kick
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             <section className="rounded-2xl bg-white border border-slate-200 p-4">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-semibold">Video Lobby</h3>
+                <h3 className="font-semibold">{isInEncounterChannel ? "Encounter Room" : "Video Lobby"}</h3>
                 <span className="text-sm text-slate-500">Participants: {participantsCount}</span>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                {videoTiles.map((tile) => (
-                  <VideoTile
-                    key={tile.key}
-                    label={tile.label}
-                    role={tile.role}
-                    ready={tile.ready}
-                    presence={tile.presence}
-                    micOn={tile.micOn}
-                    track={tile.track}
-                    showVideo={tile.showVideo}
-                  />
-                ))}
-              </div>
+              {isInEncounterChannel ? (
+                <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] items-start">
+                  <div className="space-y-2">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">{ownEncounterSquadName}</div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {encounterSplitTiles.ownSquadTiles.map((tile) => (
+                        <VideoTile
+                          key={tile.key}
+                          label={tile.label}
+                          role={tile.role}
+                          ready={tile.ready}
+                          presence={tile.presence}
+                          micOn={tile.micOn}
+                          track={tile.track}
+                          showVideo={tile.showVideo}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="hidden md:block w-px self-stretch bg-slate-300 rounded-full" />
+
+                  <div className="space-y-2">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">{opponentEncounterSquadName}</div>
+                    {encounterSplitTiles.opponentSquadTiles.length > 0 ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {encounterSplitTiles.opponentSquadTiles.map((tile) => (
+                          <VideoTile
+                            key={tile.key}
+                            label={tile.label}
+                            role={tile.role}
+                            ready={tile.ready}
+                            presence={tile.presence}
+                            micOn={tile.micOn}
+                            track={tile.track}
+                            showVideo={tile.showVideo}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                        Waiting for opponent squad members to join encounter video...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {videoTiles.map((tile) => (
+                    <VideoTile
+                      key={tile.key}
+                      label={tile.label}
+                      role={tile.role}
+                      ready={tile.ready}
+                      presence={tile.presence}
+                      micOn={tile.micOn}
+                      track={tile.track}
+                      showVideo={tile.showVideo}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
           </>
         )}
