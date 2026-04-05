@@ -113,6 +113,14 @@ export const leaveSquad = (token: string, squadId: string) => {
   });
 };
 
+export const setLobbyVideoPresence = (token: string, squadId: string, inLobbyVideo: boolean) => {
+  return backendRequest<{ memberId: string; inLobbyVideo: boolean }>(`/api/squads/${squadId}/lobby-video`, {
+    method: "POST",
+    token,
+    body: { inLobbyVideo },
+  });
+};
+
 export const getLobbyToken = (token: string, squadId: string) => {
   return backendRequest<AgoraLobbyToken>(`/api/agora/lobby-token/${squadId}`, {
     method: "POST",

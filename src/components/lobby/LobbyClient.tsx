@@ -18,6 +18,7 @@ import {
   leaveSquad,
   promoteMember,
   setReadyState,
+  setLobbyVideoPresence,
   skipEncounter,
   startSearch,
   updateSquadName,
@@ -206,7 +207,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
       const showVideo = isSelf ? Boolean(localVideoTrack && isVideoOn) : Boolean(remoteUser?.videoTrack);
       const onlineText = isInEncounterChannel ? "In encounter room" : "In video lobby";
       const offlineText = isInEncounterChannel ? "Not in encounter room" : "Not in video lobby";
-      const presence = isSelf ? (joined ? onlineText : offlineText) : remoteUser ? onlineText : offlineText;
+      // If we are not in Agora ourselves, use the backend-tracked inLobbyVideo flag
+      const remoteOnline = joined ? Boolean(remoteUser) : Boolean(member.inLobbyVideo);
+      const presence = isSelf ? (joined ? onlineText : offlineText) : remoteOnline ? onlineText : offlineText;
 
       return {
         key: member.memberId,
@@ -271,7 +274,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
       const showVideo = isSelf ? Boolean(localVideoTrack && isVideoOn) : Boolean(remoteUser?.videoTrack);
       const onlineText = isInEncounterChannel ? "In encounter room" : "In video lobby";
       const offlineText = isInEncounterChannel ? "Not in encounter room" : "Not in video lobby";
-      const presence = isSelf ? (joined ? onlineText : offlineText) : remoteUser ? onlineText : offlineText;
+      const remoteOnline = joined ? Boolean(remoteUser) : Boolean(member.inLobbyVideo);
+      const presence = isSelf ? (joined ? onlineText : offlineText) : remoteOnline ? onlineText : offlineText;
 
       return {
         key: member.memberId,
@@ -408,8 +412,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     };
   }, [backendToken, squad?.squadId]);
 
+  // Always keep squad in sync while in a squad, even when not in video.
   useEffect(() => {
-    if (!joined || !squad?.squadId) return;
+    if (!squad?.squadId) return;
 
     let cancelled = false;
 
@@ -427,13 +432,37 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     void syncSquad();
     const intervalId = setInterval(() => {
       void syncSquad();
-    }, 4000);
+    }, 2000);
 
     return () => {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [backendToken, joined, remoteUserSignature, squad?.squadId]);
+  }, [backendToken, squad?.squadId]);
+
+  // Immediately re-sync squad whenever the Agora remote-user list changes
+  // (someone joins or leaves video lobby) so tiles update without waiting for
+  // the next poll tick.
+  useEffect(() => {
+    if (!joined || !squad?.squadId) return;
+
+    let cancelled = false;
+
+    const syncSquad = async () => {
+      try {
+        const next = await getSquadById(backendToken, squad.squadId);
+        if (!cancelled) setSquad(next);
+      } catch {
+        // best-effort
+      }
+    };
+
+    void syncSquad();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [backendToken, remoteUserSignature, squad?.squadId, joined]);
 
   useEffect(() => {
     if (!encounterId || !squad || joiningAgora) return;
@@ -639,15 +668,29 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     setLoading(true);
 
     try {
-      await leaveLobby(); // Leave video if connected
+      if (joined) {
+        await setLobbyVideoPresence(backendToken, squad.squadId, false).catch(() => {});
+      }
+      await leaveLobby();
       await leaveSquad(backendToken, squad.squadId);
-      setSquad(null); // Clear squad state
+      setSquad(null);
       setMessage("Left squad successfully.");
     } catch (error) {
       const err = error as BackendApiError;
       setMessage(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onLeaveVideoLobby = async () => {
+    if (!squad) return;
+    try {
+      await setLobbyVideoPresence(backendToken, squad.squadId, false).catch(() => {});
+      await leaveLobby();
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
     }
   };
 
@@ -664,6 +707,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
         token: tokenData.rtcToken,
         uid: tokenData.uid,
       });
+      await setLobbyVideoPresence(backendToken, squad.squadId, true).catch(() => {});
       setMessage("Agora connected. You are now in squad lobby video.");
     } catch (error) {
       const err = error as BackendApiError;
@@ -755,23 +799,23 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900 p-6">
-      <div className="mx-auto max-w-5xl grid gap-6">
-        <header className="rounded-2xl bg-white border border-slate-200 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {userImage ? <img src={userImage} alt="profile" className="h-10 w-10 rounded-full" /> : null}
-            <div>
-              <p className="text-sm text-slate-500">Giggle Phase 1 Lobby Demo</p>
-              <h1 className="font-semibold">Welcome, {userName}</h1>
-            </div>
+    <main className="h-screen flex flex-col bg-slate-100 text-slate-900 overflow-hidden">
+      <header className="shrink-0 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {userImage ? <img src={userImage} alt="profile" className="h-8 w-8 rounded-full" /> : null}
+          <div>
+            <p className="text-xs text-slate-500">Giggle Phase 1 Lobby Demo</p>
+            <h1 className="font-semibold text-sm">Welcome, {userName}</h1>
           </div>
-          <button className="text-sm text-rose-600" onClick={() => signOut()}>
-            Sign out
-          </button>
-        </header>
+        </div>
+        <button className="text-sm text-rose-600" onClick={() => signOut()}>
+          Sign out
+        </button>
+      </header>
 
+      <div className="flex-1 overflow-hidden p-4">
         {!squad ? (
-          <section className="grid md:grid-cols-2 gap-4">
+          <section className="grid md:grid-cols-2 gap-4 max-w-2xl mx-auto mt-8">
             <div className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3">
               <h2 className="font-semibold">Create Squad</h2>
               <input
@@ -807,18 +851,20 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
             </div>
           </section>
         ) : (
-          <>
-            <section className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Squad Lobby</h2>
-                <div className="text-sm text-slate-500">Status: {squad.status}</div>
+          <div className="h-full flex gap-4 overflow-hidden">
+            {/* LEFT: Squad Section */}
+            <div className="w-72 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="shrink-0 bg-indigo-600 px-4 py-3 flex items-center justify-between">
+                <h2 className="font-semibold text-white text-sm">Squad</h2>
+                <span className="text-xs bg-indigo-500 text-indigo-100 rounded-full px-2 py-0.5">{squad.status}</span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+              <div className="text-xs">
+                Squad: <span className="font-semibold">{squad.squadName}</span>
               </div>
 
-              <div className="text-sm">
-                Squad name: <span className="font-semibold">{squad.squadName}</span>
-              </div>
-
-              <div className="text-sm">
+              <div className="text-xs">
                 Invite code: <span className="font-semibold">{squad.squadCode}</span>
               </div>
 
@@ -871,7 +917,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
 
                   <ActionIconButton
                     label={joined ? "Leave video lobby" : "Join lobby video"}
-                    onClick={joined ? () => leaveLobby() : onJoinLobbyVideo}
+                    onClick={joined ? onLeaveVideoLobby : onJoinLobbyVideo}
                     disabled={joiningAgora || (joined && undefined) || (!joined && undefined)}
                     tone={joined ? "slate" : "indigo"}
                     icon={<CameraStateIcon enabled={joined} className="h-6 w-6" />}
@@ -971,115 +1017,26 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                 </div>
               </div>
 
-              {isLeader ? (
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Member Management</div>
-                  <div className="grid gap-2">
-                    {(squad.members || []).map((member) => {
-                      const isMe = member.memberId === myMember?.memberId;
-                      return (
-                        <div key={member.memberId} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                          <div>
-                            <div className="font-medium">{member.displayName || member.userId}</div>
-                            <div className="text-slate-500">{member.role}</div>
-                          </div>
-                          <div className="flex gap-2">
-                            {member.role !== "leader" ? (
-                              <>
-                                <button
-                                  className="rounded-md bg-indigo-600 px-2 py-1 text-white disabled:opacity-50"
-                                  onClick={() => onPromoteMember(member.memberId)}
-                                  disabled={loading || isMe}
-                                >
-                                  Promote
-                                </button>
-                                <button
-                                  className="rounded-md bg-rose-600 px-2 py-1 text-white disabled:opacity-50"
-                                  onClick={() => onKickMember(member.memberId)}
-                                  disabled={loading || isMe}
-                                >
-                                  Kick
-                                </button>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+
+            </div>
+            </div>
+
+            {/* RIGHT: Video Lobby + Squad Members side by side */}
+            <div className="flex-1 flex gap-4 overflow-hidden">
+
+              {/* Video Lobby */}
+              <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="shrink-0 bg-slate-800 px-4 py-2.5 flex items-center justify-between">
+                  <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "Encounter Room" : "Video Lobby"}</h3>
+                  <span className="text-xs text-slate-300">{participantsCount} active</span>
                 </div>
-              ) : null}
-            </section>
-
-            <section className="rounded-2xl bg-white border border-slate-200 p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-semibold">{isInEncounterChannel ? "Encounter Room" : "Video Lobby"}</h3>
-                <div className="flex items-center gap-3 text-sm text-slate-500">
-                  <span>Squad: {squad.members?.length ?? 0}</span>
-                  <span className="text-slate-300">|</span>
-                  <span>In video: {participantsCount}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                {/* Left: video tiles for members currently in video lobby */}
-                <div className="flex-1 min-w-0">
-                  {videoTiles.filter((t) => t.presence === "In video lobby").length === 0 ? (
-                    <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 h-40 text-sm text-slate-400">
-                      No one is in the video lobby yet
-                    </div>
-                  ) : (
-                    {isInEncounterChannel ? (
-                <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] items-start">
-                  <div className="space-y-2">
-                    <div className="text-xs uppercase tracking-wide text-slate-500">{ownEncounterSquadName}</div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {encounterSplitTiles.ownSquadTiles.map((tile) => (
-                        <VideoTile
-                          key={tile.key}
-                          label={tile.label}
-                          role={tile.role}
-                          ready={tile.ready}
-                          presence={tile.presence}
-                          micOn={tile.micOn}
-                          track={tile.track}
-                          showVideo={tile.showVideo}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="hidden md:block w-px self-stretch bg-slate-300 rounded-full" />
-
-                  <div className="space-y-2">
-                    <div className="text-xs uppercase tracking-wide text-slate-500">{opponentEncounterSquadName}</div>
-                    {encounterSplitTiles.opponentSquadTiles.length > 0 ? (
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {encounterSplitTiles.opponentSquadTiles.map((tile) => (
-                          <VideoTile
-                            key={tile.key}
-                            label={tile.label}
-                            role={tile.role}
-                            ready={tile.ready}
-                            presence={tile.presence}
-                            micOn={tile.micOn}
-                            track={tile.track}
-                            showVideo={tile.showVideo}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
-                        Waiting for opponent squad members to join encounter video...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2">
-                        {videoTiles
-                        .filter((t) => t.presence === "In video lobby")
-                        .map((tile) => (
+                <div className="flex-1 overflow-y-auto p-4">
+                  {isInEncounterChannel ? (
+                    <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] items-start">
+                      <div className="space-y-2">
+                        <div className="text-xs uppercase tracking-wide text-slate-500">{ownEncounterSquadName}</div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {encounterSplitTiles.ownSquadTiles.map((tile) => (
                             <VideoTile
                               key={tile.key}
                               label={tile.label}
@@ -1091,37 +1048,121 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                               showVideo={tile.showVideo}
                             />
                           ))}
+                        </div>
+                      </div>
+                      <div className="hidden md:block w-px self-stretch bg-slate-300 rounded-full" />
+                      <div className="space-y-2">
+                        <div className="text-xs uppercase tracking-wide text-slate-500">{opponentEncounterSquadName}</div>
+                        {encounterSplitTiles.opponentSquadTiles.length > 0 ? (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {encounterSplitTiles.opponentSquadTiles.map((tile) => (
+                              <VideoTile
+                                key={tile.key}
+                                label={tile.label}
+                                role={tile.role}
+                                ready={tile.ready}
+                                presence={tile.presence}
+                                micOn={tile.micOn}
+                                track={tile.track}
+                                showVideo={tile.showVideo}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                            Waiting for opponent squad members to join encounter video...
+                          </div>
+                        )}
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      {videoTiles.filter((t) => t.presence === "In video lobby").length === 0 ? (
+                        <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 h-40 text-sm text-slate-400">
+                          No one is in the video lobby yet
+                        </div>
+                      ) : (
+                        <div className="grid gap-3 grid-cols-2">
+                          {videoTiles
+                            .filter((t) => t.presence === "In video lobby")
+                            .map((tile) => (
+                              <VideoTile
+                                key={tile.key}
+                                label={tile.label}
+                                role={tile.role}
+                                ready={tile.ready}
+                                presence={tile.presence}
+                                micOn={tile.micOn}
+                                track={tile.track}
+                                showVideo={tile.showVideo}
+                              />
+                            ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
+              </div>
 
-                {/* Right: all squad members roster */}
-                <div className="w-52 shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1">
-                  <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">Squad Members</div>
+              {/* Squad Members sidebar */}
+              <div className="w-64 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="shrink-0 bg-indigo-50 border-b border-indigo-100 px-4 py-2.5 flex items-center justify-between">
+                  <h3 className="font-semibold text-sm text-indigo-900">Squad Members</h3>
+                  <span className="text-xs text-indigo-500 font-medium">{squad.members?.length ?? 0}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
                   {(squad.members ?? []).map((member) => {
                     const tile = videoTiles.find((t) => t.key === member.memberId);
-                    const inVideo = tile?.presence === "In video lobby";
+                    const inVideo = tile?.presence === "In video lobby" || tile?.presence === "In encounter room";
+                    const isMe = member.memberId === myMember?.memberId;
                     return (
-                      <div key={member.memberId} className="flex items-center gap-2 rounded-lg px-2 py-1.5 bg-white border border-slate-200">
-                        <span
-                          className={`h-2 w-2 rounded-full shrink-0 ${inVideo ? "bg-emerald-500" : "bg-slate-300"}`}
-                          title={inVideo ? "In video lobby" : "Not in video lobby"}
-                        />
-                        <span className="text-sm font-medium truncate flex-1">{member.displayName || member.userId}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${member.role === "leader" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600"}`}>
-                          {member.role}
-                        </span>
+                      <div key={member.memberId} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`h-2 w-2 rounded-full shrink-0 ${inVideo ? "bg-emerald-500" : "bg-slate-300"}`}
+                            title={inVideo ? "In video" : "Not in video"}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{member.displayName || member.userId}</div>
+                            <div className="flex gap-1 mt-0.5 flex-wrap">
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${member.role === "leader" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
+                                {member.role}
+                              </span>
+                              {member.ready ? (
+                                <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">ready</span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                        {isLeader && member.role !== "leader" ? (
+                          <div className="flex gap-1.5">
+                            <button
+                              className="flex-1 rounded-md bg-indigo-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+                              onClick={() => onPromoteMember(member.memberId)}
+                              disabled={loading || isMe}
+                            >
+                              Promote
+                            </button>
+                            <button
+                              className="flex-1 rounded-md bg-rose-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+                              onClick={() => onKickMember(member.memberId)}
+                              disabled={loading || isMe}
+                            >
+                              Kick
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}
                 </div>
-                </div>
-              )}
-            </section>
-          </>
+              </div>
+
+            </div>
+          </div>
         )}
 
-        {message ? <p className="text-sm text-slate-600">{message}</p> : null}
+        {message ? <p className="shrink-0 text-sm text-slate-600 pt-1">{message}</p> : null}
       </div>
     </main>
   );
