@@ -27,6 +27,7 @@ export const useSquadLobbyAgora = () => {
   const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack | null>(null);
   const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([]);
   const [joined, setJoined] = useState(false);
+  const [currentChannelName, setCurrentChannelName] = useState<string | null>(null);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
 
@@ -72,6 +73,7 @@ export const useSquadLobbyAgora = () => {
       setRemoteUsers(getRemoteUsers(client));
       setIsMicOn(true);
       setIsVideoOn(true);
+      setCurrentChannelName(channelName);
       setJoined(true);
     },
     [bindClientEvents, client, joined]
@@ -105,6 +107,7 @@ export const useSquadLobbyAgora = () => {
     setLocalVideoTrack(null);
     setIsMicOn(true);
     setIsVideoOn(true);
+    setCurrentChannelName(null);
     setJoined(false);
   }, [client, joined, localAudioTrack, localVideoTrack]);
 
@@ -115,6 +118,7 @@ export const useSquadLobbyAgora = () => {
 
   return {
     joined,
+    currentChannelName,
     localVideoTrack,
     remoteUsers,
     participantsCount,
