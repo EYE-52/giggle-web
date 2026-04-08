@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import AgoraRTC, {
   IAgoraRTCClient,
   ICameraVideoTrack,
@@ -27,6 +27,9 @@ export const useSquadLobbyAgora = () => {
   const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack | null>(null);
   const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([]);
   const [joined, setJoined] = useState(false);
+  // Mutable ref so joinLobby / leaveLobby always see the current value even
+  // inside async continuations where the React state closure is stale.
+  const joinedRef = useRef(false);
   const [currentChannelName, setCurrentChannelName] = useState<string | null>(null);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
@@ -60,7 +63,7 @@ export const useSquadLobbyAgora = () => {
 
   const joinLobby = useCallback(
     async ({ appId, channelName, token, uid }: JoinArgs) => {
-      if (joined) return;
+      if (joinedRef.current) return;
 
       bindClientEvents();
       const [micTrack, camTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
@@ -68,6 +71,7 @@ export const useSquadLobbyAgora = () => {
       await client.join(appId, channelName, token, uid);
       await client.publish([micTrack, camTrack]);
 
+      joinedRef.current = true;
       setLocalAudioTrack(micTrack);
       setLocalVideoTrack(camTrack);
       setRemoteUsers(getRemoteUsers(client));
@@ -76,7 +80,7 @@ export const useSquadLobbyAgora = () => {
       setCurrentChannelName(channelName);
       setJoined(true);
     },
-    [bindClientEvents, client, joined]
+    [bindClientEvents, client]
   );
 
   const toggleMic = useCallback(async () => {
@@ -94,7 +98,7 @@ export const useSquadLobbyAgora = () => {
   }, [isVideoOn, joined, localVideoTrack]);
 
   const leaveLobby = useCallback(async () => {
-    if (!joined) return;
+    if (!joinedRef.current) return;
 
     localAudioTrack?.stop();
     localAudioTrack?.close();
@@ -103,13 +107,14 @@ export const useSquadLobbyAgora = () => {
 
     await client.leave();
 
+    joinedRef.current = false;
     setLocalAudioTrack(null);
     setLocalVideoTrack(null);
     setIsMicOn(true);
     setIsVideoOn(true);
     setCurrentChannelName(null);
     setJoined(false);
-  }, [client, joined, localAudioTrack, localVideoTrack]);
+  }, [client, localAudioTrack, localVideoTrack]);
 
   const participantsCount = useMemo(() => {
     const local = joined ? 1 : 0;

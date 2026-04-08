@@ -113,6 +113,20 @@ export const leaveSquad = (token: string, squadId: string) => {
   });
 };
 
+export const setLobbyVideoPresence = (token: string, squadId: string, inLobbyVideo: boolean) => {
+  return backendRequest<{ memberId: string; inLobbyVideo: boolean }>(`/api/squads/${squadId}/lobby-video`, {
+    method: "POST",
+    token,
+    body: { inLobbyVideo },
+  });
+};
+export const setEncounterVideoPresence = (token: string, squadId: string, inEncounterVideo: boolean) => {
+  return backendRequest<{ memberId: string; inEncounterVideo: boolean }>(`/api/squads/${squadId}/encounter-video`, {
+    method: 'POST',
+    token,
+    body: { inEncounterVideo },
+  });
+};
 export const getLobbyToken = (token: string, squadId: string) => {
   return backendRequest<AgoraLobbyToken>(`/api/agora/lobby-token/${squadId}`, {
     method: "POST",
@@ -153,7 +167,7 @@ export const getEncounterToken = (token: string, squadId: string, encounterId: s
 };
 
 export const disconnectEncounter = (token: string, squadId: string, encounterId: string) => {
-  return backendRequest<{ encounterId: string; memberId: string; disconnected: boolean; squadStatus: string }>(
+  return backendRequest<{ encounterId: string; memberId: string; disconnected: boolean; isLeaderDisconnect: boolean; squadStatus: string }>(
     `/api/encounters/disconnect`,
     {
       method: "POST",

@@ -9,6 +9,8 @@ export type SquadMember = {
   displayName?: string;
   role: SquadRole;
   ready: boolean;
+  inLobbyVideo?: boolean;
+  inEncounterVideo?: boolean;
   joinedAt: string;
 };
 
