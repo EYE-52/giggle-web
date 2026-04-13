@@ -1164,9 +1164,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     icon={<LeaveSquadIcon />}
                   />
                 </div>
-                <div className="text-xs text-slate-500">
+                {/* <div className="text-xs text-slate-500">
                   Hover an icon to see action name. {isLeader ? "Matchmaking is leader-only." : ""}
-                </div>
+                </div> */}
               </div>
 
 
