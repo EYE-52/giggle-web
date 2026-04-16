@@ -45,12 +45,12 @@ type ActionIconButtonProps = {
 };
 
 const toneClassMap: Record<ActionIconButtonProps["tone"], string> = {
-  indigo: "bg-indigo-600 text-white",
-  slate: "bg-slate-200 text-slate-900",
-  amber: "bg-amber-500 text-white",
-  cyan: "bg-cyan-600 text-white",
-  emerald: "bg-emerald-600 text-white",
-  rose: "bg-rose-600 text-white",
+  indigo: "bg-[#516051] text-white",
+  slate: "bg-[#eef2ec] text-[#1b1c1a]",
+  amber: "bg-[#d6a83d] text-white",
+  cyan: "bg-[#2aa9b6] text-white",
+  emerald: "bg-[#3f765f] text-white",
+  rose: "bg-[#c53947] text-white",
 };
 
 function ActionIconButton({ label, title, onClick, disabled, tone, icon }: ActionIconButtonProps) {
@@ -166,27 +166,6 @@ function CancelSearchIcon() {
   );
 }
 
-// Acknowledge (thumbs up)
-function AcknowledgeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z" strokeLinejoin="round" />
-      <path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-// Join encounter video (video + arrow)
-function JoinEncounterIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="2" y="7" width="14" height="10" rx="2" />
-      <path d="M16 11l5-3v8l-5-3" strokeLinejoin="round" />
-      <path d="M6 12h5m-2-2l2 2-2 2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 // Disconnect (plug with X)
 function DisconnectIcon() {
   return (
@@ -279,7 +258,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
   }, [displayName, squad]);
 
   const isLeader = myMember?.role === "leader";
-  const allReady = squad && squad.members && squad.members.length > 0 && squad.members.every((member) => member.ready);
+  const allInLobbyVideo = squad && squad.members && squad.members.length > 0 && squad.members.every((member) => member.inLobbyVideo);
+  const allReady = squad && squad.members && squad.members.length > 0 && squad.members.every((member) => member.ready === true);
+  const canStartSearch = allInLobbyVideo && allReady;
   const autoJoinedEncounterRef = useRef<string | null>(null);
   const encounterId = matchStatus?.match?.encounterId || null;
   const isInEncounterChannel = Boolean(joined && currentChannelName?.startsWith("encounter_"));
@@ -572,9 +553,42 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     };
   }, [backendToken, remoteUserSignature, squad?.squadId, joined]);
 
+  // Auto-acknowledge encounters when matched (skip "Confirm Match" button).
+  // As soon as a match is found, immediately acknowledge so the encounter
+  // transitions to "active" and all squad members auto-join.
+  useEffect(() => {
+    if (!squad || !encounterId) return;
+    const isMatched = squad.status === "matched" || matchStatus?.state === "matched";
+    if (!isMatched) return;
+    if (handoffStatus?.status === "active") return; // already active
+
+    let cancelled = false;
+
+    const autoAck = async () => {
+      try {
+        await acknowledgeEncounter(backendToken, encounterId, squad.squadId);
+        if (!cancelled) {
+          const handoff = await getEncounterHandoffStatus(backendToken, encounterId);
+          if (!cancelled) setHandoffStatus(handoff);
+          const status = await getMatchmakingStatus(backendToken, squad.squadId);
+          if (!cancelled) setMatchStatus(status);
+        }
+      } catch {
+        // best-effort auto-ack; if it fails, will retry in next poll
+      }
+    };
+
+    void autoAck();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [backendToken, encounterId, handoffStatus?.status, matchStatus?.state, squad]);
+
   useEffect(() => {
     if (!encounterId || !squad || joiningAgora) return;
-    if (handoffStatus?.status !== "active" || squad.status !== "in_encounter") return;
+    const encounterReady = handoffStatus?.status === "active" && (squad.status === "in_encounter" || matchStatus?.state === "in_encounter");
+    if (!encounterReady) return;
 
     const expectedChannel = `encounter_${encounterId}`;
     if (joined && currentChannelName === expectedChannel) {
@@ -640,15 +654,43 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     squad,
   ]);
 
-  // When polling detects the encounter is over but we are still connected to an
-  // encounter Agora channel, leave automatically so remote-user tiles clear.
+  // When encounter ends, auto-rejoin lobby channel for members who were in the encounter
   useEffect(() => {
     if (!joined || !currentChannelName?.startsWith("encounter_")) return;
-    if (!matchStatus || matchStatus.match?.encounterId) return;
-    autoJoinedEncounterRef.current = null;
-    void setEncounterVideoPresence(backendToken, squad?.squadId ?? "", false).catch(() => {});
-    void leaveLobby();
-  }, [joined, currentChannelName, matchStatus, leaveLobby, backendToken, squad?.squadId]);
+    if (matchStatus?.match?.encounterId) {
+      // Encounter is still active
+      return;
+    }
+    
+    // Encounter has ended and we're still in the old encounter channel.
+    // Leave encounter and rejoin lobby if we have members in the encounter.
+    const autoRejoinLobby = async () => {
+      try {
+        setJoiningAgora(true);
+        // Leave old encounter channel
+        await leaveLobby();
+        autoJoinedEncounterRef.current = null;
+        await setEncounterVideoPresence(backendToken, squad?.squadId ?? "", false).catch(() => {});
+        
+        // Rejoin lobby channel
+        const tokenData = await getLobbyToken(backendToken, squad?.squadId ?? "");
+        await joinLobby({
+          appId: tokenData.appId,
+          channelName: tokenData.channelName,
+          token: tokenData.rtcToken,
+          uid: tokenData.uid,
+        });
+        await setLobbyVideoPresence(backendToken, squad?.squadId ?? "", true).catch(() => {});
+      } catch (error) {
+        // Silently handle errors; UI still functional
+      } finally {
+        setJoiningAgora(false);
+      }
+    };
+
+    void autoRejoinLobby();
+  }, [joined, currentChannelName, matchStatus?.match?.encounterId, backendToken, squad?.squadId, leaveLobby, joinLobby]);
+
 
   const onCreateSquad = async () => {
     setLoading(true);
@@ -855,74 +897,35 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     }
   };
 
-  const onAcknowledgeEncounter = async () => {
-    if (!squad || !encounterId) return;
-    setLoading(true);
-
-    try {
-      await acknowledgeEncounter(backendToken, encounterId, squad.squadId);
-      setMessage("Encounter acknowledged.");
-      const handoff = await getEncounterHandoffStatus(backendToken, encounterId);
-      setHandoffStatus(handoff);
-      const status = await getMatchmakingStatus(backendToken, squad.squadId);
-      setMatchStatus(status);
-      await refreshSquad(squad.squadId);
-    } catch (error) {
-      const err = error as BackendApiError;
-      setMessage(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onJoinEncounterVideo = async () => {
-    if (!squad || !encounterId) return;
-    setJoiningAgora(true);
-
-    try {
-      await leaveLobby();
-      const tokenData = await getEncounterToken(backendToken, squad.squadId, encounterId);
-      await joinLobby({
-        appId: tokenData.appId,
-        channelName: tokenData.channelName,
-        token: tokenData.rtcToken,
-        uid: tokenData.uid,
-      });
-      await Promise.all([
-        setLobbyVideoPresence(backendToken, squad.squadId, false).catch(() => {}),
-        setEncounterVideoPresence(backendToken, squad.squadId, true).catch(() => {}),
-      ]);
-      setMessage("Joined encounter video.");
-    } catch (error) {
-      const err = error as BackendApiError;
-      setMessage(err.message || "Failed to join encounter video");
-    } finally {
-      setJoiningAgora(false);
-    }
-  };
-
   const onDisconnectEncounter = async () => {
     if (!squad || !encounterId) return;
     setLoading(true);
 
     try {
       const result = await disconnectEncounter(backendToken, squad.squadId, encounterId);
+      
+      // Return to lobby
       await leaveLobby();
+      autoJoinedEncounterRef.current = null;
       await setEncounterVideoPresence(backendToken, squad.squadId, false).catch(() => {});
-      if (result.isLeaderDisconnect) {
-        // Leader ended the encounter — clear all state
-        autoJoinedEncounterRef.current = null;
-        await refreshSquad(squad.squadId);
-        setMatchStatus(null);
-        setHandoffStatus(null);
-        setMessage("Encounter ended for your squad.");
-      } else {
-        // Non-leader just left the Agora channel; encounter still running
-        setMessage("Left encounter video. Encounter is still active.");
-      }
+
+      // Rejoin lobby
+      const tokenData = await getLobbyToken(backendToken, squad.squadId);
+      await joinLobby({
+        appId: tokenData.appId,
+        channelName: tokenData.channelName,
+        token: tokenData.rtcToken,
+        uid: tokenData.uid,
+      });
+      await setLobbyVideoPresence(backendToken, squad.squadId, true).catch(() => {});
+      await refreshSquad(squad.squadId);
+      const status = await getMatchmakingStatus(backendToken, squad.squadId);
+      setMatchStatus(status);
+      setHandoffStatus(null);
+      setMessage("Encounter disconnected. Your squad returned to the lobby.");
     } catch (error) {
       const err = error as BackendApiError;
-      setMessage(err.message);
+      setMessage(err.message || "Failed to disconnect encounter");
     } finally {
       setLoading(false);
     }
@@ -937,6 +940,16 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
       await leaveLobby();
       autoJoinedEncounterRef.current = null;
       await setEncounterVideoPresence(backendToken, squad.squadId, false).catch(() => {});
+
+      const tokenData = await getLobbyToken(backendToken, squad.squadId);
+      await joinLobby({
+        appId: tokenData.appId,
+        channelName: tokenData.channelName,
+        token: tokenData.rtcToken,
+        uid: tokenData.uid,
+      });
+      await setLobbyVideoPresence(backendToken, squad.squadId, true).catch(() => {});
+
       await refreshSquad(squad.squadId);
       const status = await getMatchmakingStatus(backendToken, squad.squadId);
       setMatchStatus(status);
@@ -951,22 +964,22 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
   };
 
   return (
-    <main className="h-screen flex flex-col bg-slate-100 text-slate-900 overflow-hidden">
-      <header className="shrink-0 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+    <main className="h-screen flex flex-col landing-shell overflow-hidden">
+      <header className="shrink-0 landing-header border-b border-[rgba(255,255,255,0.1)] px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {userImage ? (
             <img src={userImage} alt="profile" className="h-8 w-8 rounded-full" />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-semibold shrink-0">
+            <div className="h-8 w-8 rounded-full bg-[#516051] flex items-center justify-center text-white text-sm font-semibold shrink-0">
               {userName?.charAt(0).toUpperCase() ?? "?"}
             </div>
           )}
           <div>
-            <p className="text-xs text-slate-500">Giggle Phase 1 Lobby Demo</p>
+            <p className="text-xs text-[#f0f2ec]">Giggle Phase 1 Lobby Demo</p>
             <h1 className="font-semibold text-sm">Welcome, {userName}</h1>
           </div>
         </div>
-        <button className="text-sm text-rose-600" onClick={() => signOut()}>
+        <button className="text-sm text-white" onClick={() => signOut()}>
           Sign out
         </button>
       </header>
@@ -974,16 +987,16 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
       <div className="flex-1 overflow-hidden p-4">
         {!squad ? (
           <section className="grid md:grid-cols-2 gap-4 max-w-2xl mx-auto mt-8">
-            <div className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3">
+            <div className="rounded-2xl landing-card border p-4 space-y-3">
               <h2 className="font-semibold">Create Squad</h2>
               <input
-                className="w-full rounded-lg border border-slate-300 p-2"
+                className="w-full rounded-lg border border-[#c5c9c1] p-2"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Display name"
               />
               <button
-                className="w-full rounded-lg bg-slate-900 text-white py-2 disabled:opacity-50"
+                className="w-full rounded-lg bg-[#516051] text-white py-2 disabled:opacity-50"
                 onClick={onCreateSquad}
                 disabled={loading}
               >
@@ -991,16 +1004,16 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
               </button>
             </div>
 
-            <div className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3">
+            <div className="rounded-2xl landing-card border p-4 space-y-3">
               <h2 className="font-semibold">Join Squad</h2>
               <input
-                className="w-full rounded-lg border border-slate-300 p-2 uppercase"
+                className="w-full rounded-lg border border-[#c5c9c1] p-2 uppercase"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
                 placeholder="ABC-123"
               />
               <button
-                className="w-full rounded-lg bg-emerald-600 text-white py-2 disabled:opacity-50"
+                className="w-full rounded-lg bg-[#697969] text-white py-2 disabled:opacity-50"
                 onClick={onJoinSquad}
                 disabled={loading}
               >
@@ -1011,10 +1024,10 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
         ) : (
           <div className="h-full flex gap-4 overflow-hidden">
             {/* LEFT: Squad Section */}
-            <div className="w-72 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="shrink-0 bg-indigo-600 px-4 py-3 flex items-center justify-between">
+            <div className="w-72 shrink-0 flex flex-col overflow-hidden rounded-2xl border landing-card shadow-sm">
+              <div className="shrink-0 landing-header px-4 py-3 flex items-center justify-between">
                 <h2 className="font-semibold text-white text-sm">Squad</h2>
-                <span className="text-xs bg-indigo-500 text-indigo-100 rounded-full px-2 py-0.5">{squad.status}</span>
+                <span className="text-xs bg-[#7f9b8f] text-[#f7faf6] rounded-full px-2 py-0.5">{squad.status}</span>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
 
@@ -1026,14 +1039,14 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                 Invite code: <span className="font-semibold">{squad.squadCode}</span>
               </div>
 
-              <div className="text-xs text-slate-600 rounded-lg border border-slate-200 bg-slate-50 p-2">
+              <div className="text-xs text-[#3e443d] rounded-lg border border-[var(--border)] bg-[#efeeeb] p-2">
                 Match state: <span className="font-medium">{matchStatus?.state || squad.status}</span>
                 {matchStatus?.queue ? ` | Queue wait: ${matchStatus.queue.waitSeconds}s` : ""}
                 {encounterId ? ` | Encounter: ${encounterId}` : ""}
               </div>
 
               {encounterId && matchStatus?.match ? (
-                <div className="text-xs text-slate-700 rounded-lg border border-cyan-200 bg-cyan-50 p-2">
+                <div className="text-xs text-[#3b5f57] rounded-lg border border-[#cde2da] bg-[#eef5f1] p-2">
                   Encounter room: <span className="font-semibold">{matchStatus.match.ownSquadName}</span>
                   {" vs "}
                   <span className="font-semibold">{matchStatus.match.opponentSquadName}</span>
@@ -1041,17 +1054,17 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
               ) : null}
 
               {isLeader ? (
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Squad Name</div>
+                <div className="rounded-xl landing-panel border border-[var(--border)] p-3 space-y-2">
+                  <div className="text-xs uppercase tracking-wide text-[#4a5d4f]">Squad Name</div>
                   <input
-                    className="w-full rounded-lg border border-slate-300 p-2 text-sm"
+                    className="w-full rounded-lg border border-[#c5c9c1] p-2 text-sm"
                     value={newSquadName}
                     onChange={(e) => setNewSquadName(e.target.value)}
                     placeholder={squad.squadName}
                     maxLength={32}
                   />
                   <button
-                    className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-50"
+                    className="w-full rounded-lg bg-[#516051] px-3 py-2 text-sm text-white disabled:opacity-50"
                     onClick={onUpdateSquadName}
                     disabled={loading || newSquadName.trim().length < 2}
                   >
@@ -1060,8 +1073,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                 </div>
               ) : null}
 
-              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-3">
-                <div className="text-xs uppercase tracking-wide text-slate-500">Quick Controls</div>
+              <div className="rounded-xl landing-panel border border-[var(--border)] p-3 space-y-3">
+                <div className="text-xs uppercase tracking-wide text-[#4a5d4f]">Quick Controls</div>
                 <div className="flex flex-wrap gap-2">
                   <ActionIconButton
                     label={myMember?.ready ? "Not ready" : "Ready"}
@@ -1098,9 +1111,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                   {isLeader && squad.status === "idle" ? (
                     <ActionIconButton
                       label="Find match"
-                      title={!allReady ? "Everyone must be ready" : "Start matchmaking"}
+                      title={!canStartSearch ? "All members must be ready and in the video lobby" : "Start matchmaking"}
                       onClick={onStartSearch}
-                      disabled={loading || !allReady}
+                      disabled={loading || !canStartSearch}
                       tone="emerald"
                       icon={<MatchmakeIcon />}
                     />
@@ -1116,25 +1129,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     />
                   ) : null}
 
-                  {encounterId && squad.status === "matched" ? (
-                    <ActionIconButton
-                      label="Confirm match"
-                      onClick={onAcknowledgeEncounter}
-                      disabled={loading}
-                      tone="emerald"
-                      icon={<AcknowledgeIcon />}
-                    />
-                  ) : null}
 
-                  {encounterId && squad.status !== "idle" ? (
-                    <ActionIconButton
-                      label="Join encounter"
-                      onClick={onJoinEncounterVideo}
-                      disabled={joiningAgora}
-                      tone="cyan"
-                      icon={<JoinEncounterIcon />}
-                    />
-                  ) : null}
 
                   {encounterId ? (
                     <ActionIconButton
@@ -1177,10 +1172,10 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
             <div className="flex-1 flex gap-4 overflow-hidden">
 
               {/* Video Lobby / Encounter Room */}
-              <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className={`shrink-0 px-4 py-2.5 flex items-center justify-between ${isInEncounterChannel ? "bg-rose-900" : "bg-slate-800"}`}>
+              <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border landing-card shadow-sm">
+                <div className={`shrink-0 px-4 py-2.5 flex items-center justify-between ${isInEncounterChannel ? "landing-danger" : "landing-header"}`}>
                   <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "⚔ Encounter Room" : "Video Lobby"}</h3>
-                  <span className="text-xs text-slate-300">{participantsCount} active</span>
+                  <span className="text-xs text-[#f0f2ec]">{participantsCount} active</span>
                 </div>
                 <div className="flex-1 overflow-hidden">
                   {isInEncounterChannel ? (
@@ -1189,8 +1184,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                       {/* Own squad side */}
                       <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
                         <div className="shrink-0 flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wide text-indigo-700 bg-indigo-50 rounded-full px-2 py-0.5">{ownEncounterSquadName}</span>
-                          <span className="text-xs text-slate-400">{encounterSplitTiles.ownSquadTiles.length} member{encounterSplitTiles.ownSquadTiles.length !== 1 ? "s" : ""}</span>
+                          <span className="text-xs font-bold uppercase tracking-wide text-[#35513f] bg-[#eef2ec] rounded-full px-2 py-0.5">{ownEncounterSquadName}</span>
+                          <span className="text-xs text-[#6a6c63]">{encounterSplitTiles.ownSquadTiles.length} member{encounterSplitTiles.ownSquadTiles.length !== 1 ? "s" : ""}</span>
                         </div>
                         <div
                           className="flex-1 grid gap-2 content-start"
@@ -1218,13 +1213,13 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                       </div>
 
                       {/* Divider */}
-                      <div className="shrink-0 w-px bg-slate-200 self-stretch" />
+                      <div className="shrink-0 w-px bg-[#d8d8d0] self-stretch" />
 
                       {/* Opponent squad side */}
                       <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
                         <div className="shrink-0 flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wide text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">{opponentEncounterSquadName}</span>
-                          <span className="text-xs text-slate-400">{encounterSplitTiles.opponentSquadTiles.length} member{encounterSplitTiles.opponentSquadTiles.length !== 1 ? "s" : ""}</span>
+                          <span className="text-xs font-bold uppercase tracking-wide text-[#944147] bg-[#f9dedf] rounded-full px-2 py-0.5">{opponentEncounterSquadName}</span>
+                          <span className="text-xs text-[#6a6c63]">{encounterSplitTiles.opponentSquadTiles.length} member{encounterSplitTiles.opponentSquadTiles.length !== 1 ? "s" : ""}</span>
                         </div>
                         {encounterSplitTiles.opponentSquadTiles.length > 0 ? (
                           <div
@@ -1251,8 +1246,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                             ))}
                           </div>
                         ) : (
-                          <div className="flex-1 flex items-center justify-center rounded-xl border border-dashed border-rose-200 bg-rose-50">
-                            <p className="text-sm text-rose-400 text-center px-4">Waiting for opponent to join encounter video...</p>
+                          <div className="flex-1 flex items-center justify-center rounded-xl border border-[#f4c4c6] bg-[#fdeaef]">
+                            <p className="text-sm text-[#b5414d] text-center px-4">Waiting for opponent to join encounter video...</p>
                           </div>
                         )}
                       </div>
@@ -1261,7 +1256,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     // ── VIDEO LOBBY ──────────────────────────────────────────────
                     <div className="h-full overflow-y-auto p-4">
                       {videoTiles.filter((t) => t.presence === "In video lobby").length === 0 ? (
-                        <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 h-40 text-sm text-slate-400">
+                        <div className="flex items-center justify-center rounded-xl border border-dashed border-[#c5c9c1] bg-[#efeeeb] h-40 text-sm text-[#6a6c63]">
                           No one is in the video lobby yet
                         </div>
                       ) : (
@@ -1289,10 +1284,10 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
 
               {/* Squad Members sidebar — hidden during encounter to maximise video space */}
               {!isInEncounterChannel ? (
-              <div className="w-64 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="shrink-0 bg-indigo-50 border-b border-indigo-100 px-4 py-2.5 flex items-center justify-between">
-                  <h3 className="font-semibold text-sm text-indigo-900">Squad Members</h3>
-                  <span className="text-xs text-indigo-500 font-medium">{squad.members?.length ?? 0}</span>
+              <div className="w-64 shrink-0 flex flex-col overflow-hidden rounded-2xl border landing-card shadow-sm">
+                <div className="shrink-0 bg-[#eef2ec] border-b border-[#d8d8d0] px-4 py-2.5 flex items-center justify-between">
+                  <h3 className="font-semibold text-sm text-[#35513f]">Squad Members</h3>
+                  <span className="text-xs text-[#4a6b5f] font-medium">{squad.members?.length ?? 0}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
                   {(squad.members ?? []).map((member) => {
@@ -1300,16 +1295,16 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     const inVideo = tile?.presence === "In video lobby" || tile?.presence === "In encounter room";
                     const isMe = member.memberId === myMember?.memberId;
                     return (
-                      <div key={member.memberId} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 space-y-1.5">
+                      <div key={member.memberId} className="rounded-lg border border-[var(--border)] bg-[#efeeeb] px-2 py-2 space-y-1.5">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`h-2 w-2 rounded-full shrink-0 ${inVideo ? "bg-emerald-500" : "bg-slate-300"}`}
+                            className={`h-2 w-2 rounded-full shrink-0 ${inVideo ? "bg-emerald-500" : "bg-[#c5c9c1]"}`}
                             title={inVideo ? "In video" : "Not in video"}
                           />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{member.displayName || member.userId}</div>
                             <div className="flex gap-1 mt-0.5 flex-wrap">
-                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${member.role === "leader" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${member.role === "leader" ? "bg-[#eef2ec] text-[#35513f]" : "bg-[#f1f2ed] text-[#6a6c63]"}`}>
                                 {member.role}
                               </span>
                               {member.ready ? (
@@ -1321,14 +1316,14 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                         {isLeader && member.role !== "leader" ? (
                           <div className="flex gap-1.5">
                             <button
-                              className="flex-1 rounded-md bg-indigo-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+                              className="flex-1 rounded-md bg-[#516051] px-2 py-1 text-xs text-white disabled:opacity-50"
                               onClick={() => onPromoteMember(member.memberId)}
                               disabled={loading || isMe}
                             >
                               Promote
                             </button>
                             <button
-                              className="flex-1 rounded-md bg-rose-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+                              className="flex-1 rounded-md bg-[#c53947] px-2 py-1 text-xs text-white disabled:opacity-50"
                               onClick={() => onKickMember(member.memberId)}
                               disabled={loading || isMe}
                             >
@@ -1347,7 +1342,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
           </div>
         )}
 
-        {message ? <p className="shrink-0 text-sm text-slate-600 pt-1">{message}</p> : null}
+        {message ? <p className="shrink-0 text-sm text-[#4a544a] pt-1">{message}</p> : null}
       </div>
     </main>
   );

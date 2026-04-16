@@ -3,14 +3,26 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f3f0;
+  --foreground: #1b1c1a;
+  --surface: #ffffff;
+  --surface-muted: #efeeeb;
+  --accent: #516051;
+  --accent-soft: #697969;
+  --danger: #c53947;
+  --border: rgba(0, 0, 0, 0.08);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --surface: #111111;
+    --surface-muted: #161616;
+    --accent: #4f7d63;
+    --accent-soft: #718a75;
+    --danger: #b33d3d;
+    --border: rgba(255, 255, 255, 0.12);
   }
 }
 
@@ -18,4 +30,33 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+.landing-shell {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.landing-card {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.landing-panel {
+  background: var(--surface-muted);
+}
+
+.landing-header {
+  background: var(--accent);
+  color: white;
+}
+
+.landing-header-soft {
+  background: var(--accent-soft);
+  color: white;
+}
+
+.landing-danger {
+  background: var(--danger);
+  color: white;
 }
