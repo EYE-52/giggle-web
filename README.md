@@ -36,6 +36,7 @@ npm run dev
 - View squad members and ready states
 - Join Agora squad lobby video
 - Leader can start matchmaking state when all members are ready
+- Lobby and encounter pages use the same landing-page-inspired visual palette for a consistent experience
 
 ## Backend Requirements
 

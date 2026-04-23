@@ -71,7 +71,7 @@ export function VideoTile({ label, track, role, ready, presence, micOn, showVide
   }, [showVideo, track]);
 
   return (
-    <div className="relative rounded-xl border border-slate-300 bg-slate-900 overflow-hidden aspect-video">
+    <div className="relative rounded-xl border border-[#c5c9c1] bg-[#1a2119] overflow-hidden aspect-video">
       <div ref={videoRef} className="h-full w-full" />
       <div className="absolute right-2 top-2 flex gap-1">
         <span
@@ -92,13 +92,13 @@ export function VideoTile({ label, track, role, ready, presence, micOn, showVide
         </span>
       </div>
       {!showVideo ? (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-300 bg-slate-900/90">
+        <div className="absolute inset-0 flex items-center justify-center text-sm text-[#d9e2d1] bg-[#1a2119]/90">
           Camera off
         </div>
       ) : null}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-white">
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-[#f8fbf6]">
         <div className="font-medium">{label}</div>
-        <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-200">
+        <div className="mt-1 flex flex-wrap gap-2 text-xs text-[#d9e2d1]">
           {role ? <span className="rounded-full bg-white/10 px-2 py-1">{role}</span> : null}
           {typeof ready === "boolean" ? (
             <span className={`rounded-full px-2 py-1 ${ready ? "bg-emerald-500/30 text-emerald-100" : "bg-amber-500/30 text-amber-100"}`}>
