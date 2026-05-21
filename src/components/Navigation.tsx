@@ -5,8 +5,8 @@ import { ThemeToggle } from "./ThemeToggle";
 
 export function Navigation() {
   return (
-    <nav className="flex items-center justify-between max-w-[1280px] mx-auto px-[32px] py-[24px] animate-fade-in">
-      <h1 className="text-[24px] font-extrabold text-[#1b1c1a] dark:text-white">Giggle</h1>
+    <nav className="flex items-center justify-between max-w-[1280px] mx-auto px-[32px] py-[24px] animate-fade-in relative z-50">
+      <div className="text-[#516051] dark:text-white font-black text-2xl tracking-tighter">giggle.</div>
       <div className="flex items-center gap-[32px]">
         <a
           href="#about"

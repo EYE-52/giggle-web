@@ -1,303 +1,279 @@
-import { auth, signIn } from "@/auth";
+"use client";
+
+import { signIn, useSession } from "next-auth/react";
 import { LobbyClient } from "@/components/lobby/LobbyClient";
 import RotatingHeadline from "@/components/RotatingHeadline";
-import AnimatedText from "@/components/AnimatedText";
 import { Navigation } from "@/components/Navigation";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useRef } from "react";
+import { 
+  Users, 
+  Target, 
+  ShieldCheck, 
+  MessageSquare, 
+  Zap, 
+  Lock 
+} from "lucide-react";
 
-export default async function Home() {
-  const session = await auth();
+export default function Home() {
+  const { data: session, status } = useSession();
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"]
+  });
+
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
+
+  if (status === "loading") {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#f7faf6] dark:bg-gray-950">
+        <div className="w-12 h-12 border-4 border-[#516051] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (session) {
+    return (
+      <LobbyClient
+        backendToken={session.backendToken || ""}
+        userName={session.user?.name || "User"}
+        userImage={session.user?.image}
+      />
+    );
+  }
 
   return (
-    <>
-      {!session ? (
-        <main className="min-h-screen bg-white dark:bg-gray-900 overflow-hidden">
-          {/* Navigation */}
-          <Navigation />
+    <div ref={containerRef} className="bg-[#f7faf6] dark:bg-gray-950 text-gray-900 dark:text-gray-100 selection:bg-[#516051] selection:text-white">
+      <Navigation />
 
-          {/* Hero Section */}
-          <section className="max-w-[1280px] mx-auto px-[32px] py-[96px] relative">
-            <div className="grid grid-cols-2 gap-[64px] items-center">
-              {/* Left Column */}
-              <div className="flex flex-col gap-[32px]">
-                <div className="animate-fade-in-up-loop" style={{ animationDelay: "0.1s" }}>
-                  <RotatingHeadline />
-                </div>
-                <p
-                  className="text-[20px] text-[#434842] dark:text-gray-300 leading-[32px] max-w-[576px] animate-fade-in-up-loop"
-                  style={{ animationDelay: "0.2s" }}
-                >
-                  Bring your friends into a shared video space and get matched with another squad in real-time. Experience meaningful connections with groups, not strangers alone. A premium, moderated way to discover new friends together.
-                </p>
-                <div
-                  className="flex gap-[16px] pt-[8px] animate-fade-in-up-loop"
-                  style={{ animationDelay: "0.3s" }}
-                >
-                  <form
-                    action={async () => {
-                      "use server";
-                      await signIn("google");
-                    }}
-                  >
-                    <button className="px-[32px] py-[16px] bg-gradient-to-br from-[#516051] to-[#697969] text-white rounded-[8px] font-semibold hover:shadow-lg transition-all shadow-md hover:scale-105 active:scale-95">
-                      Create Your Squad
-                    </button>
-                  </form>
-                </div>
-              </div>
+      {/* Hero Section */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden px-6 pt-20">
+        <motion.div 
+          style={{ y: backgroundY }}
+          className="absolute inset-0 z-0 opacity-20 dark:opacity-10 pointer-events-none"
+        >
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#516051] rounded-full blur-[128px] animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#697969] rounded-full blur-[128px]" />
+        </motion.div>
 
-              {/* Right Column - Featured Card with Testimonial */}
-              <div className="flex flex-col justify-center relative">
-                {/* Main Card */}
-                <div
-                  className="transform rotate-1 shadow-lg rounded-[12px] overflow-hidden bg-white dark:bg-gray-800 border border-[rgba(0,0,0,0.08)] dark:border-gray-700 animate-fade-in-up-loop"
-                  style={{ animationDelay: "0.4s" }}
-                >
-                  {/* Browser Header */}
-                  <div className="bg-[#f1f1f1] dark:bg-gray-700 flex gap-[6px] items-center px-[16px] py-[10px]">
-                    <div className="w-[8px] h-[8px] rounded bg-[#ff5f56] animate-bounce-in-loop" style={{ animationDelay: "0.5s" }} />
-                    <div className="w-[8px] h-[8px] rounded bg-[#ffbd2e] animate-bounce-in-loop" style={{ animationDelay: "0.6s" }} />
-                    <div className="w-[8px] h-[8px] rounded bg-[#27c93f] animate-bounce-in-loop" style={{ animationDelay: "0.7s" }} />
-                    <div className="flex-1 ml-[12px] bg-white dark:bg-gray-200 rounded border border-[rgba(0,0,0,0.05)] dark:border-gray-600 h-[18px]" />
-                  </div>
-                  {/* Content */}
-                  <div className="bg-[#efeeeb] dark:bg-gray-600 aspect-video flex items-center justify-center overflow-hidden">
-                    <img
-                      src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=400&fit=crop"
-                      alt="Squad meeting"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-
-                {/* Testimonial Card - Right Side */}
-                <div
-                  className="absolute -right-12 bottom-2 transform -rotate-2 bg-white dark:bg-gray-800 rounded-[12px] p-[25px] border border-[rgba(196,200,192,0.2)] dark:border-gray-600 shadow-lg max-w-[320px] animate-fade-in-up-loop"
-                  style={{ animationDelay: "0.5s" }}
-                >
-                  <div className="flex items-center gap-[8px] mb-[12px]">
-                    <div className="w-[8px] h-[8px] rounded-full bg-[#516051] animate-pulse" />
-                    <span className="text-[12px] font-semibold text-[#516051] uppercase tracking-[1.2px]">
-                      LIVE NOW
-                    </span>
-                  </div>
-                  <p className="text-[14px] text-[#1b1c1a] font-medium leading-[20px]">
-                    "Found our twin squad in Tokyo. We've been talking for 3 hours."
-                  </p>
-                </div>
-              </div>
+        <div className="max-w-5xl mx-auto z-10 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#516051]/10 border border-[#516051]/20 text-[#516051] dark:text-gray-300 text-xs font-bold uppercase tracking-widest mb-8">
+              <Zap size={14} className="fill-current" />
+              <span>The Squad Discovery Platform</span>
             </div>
-          </section>
 
-          {/* Value Proposition Section */}
-          <section className="bg-[#f5f3f0] py-[96px]">
-            <div className="max-w-[1280px] mx-auto px-[32px]">
-              <div className="mb-[64px] animate-fade-in-up-loop">
-                <h3 className="text-[48px] font-extrabold text-[#1b1c1a] leading-[56px] mb-[16px]">
-                  <AnimatedText text="Why Squad Discovery?" className="text-[48px] font-extrabold text-[#1b1c1a] leading-[56px]" delay={0} />
-                </h3>
-                <p className="text-[18px] text-[#697969]">
-                  Traditional video chat platforms pair individual strangers. Giggle reimagines social discovery by bringing groups together for genuinely meaningful interactions.
-                </p>
-              </div>
-
-              {/* Value Cards */}
-              <div className="grid grid-cols-3 gap-[32px]">
-                <div
-                  className="bg-white rounded-[12px] p-[32px] animate-fade-in-up-loop hover:shadow-lg transition-all duration-300 hover:translate-y-[-8px]"
-                  style={{ animationDelay: "0.1s" }}
-                >
-                  <div className="text-[48px] mb-[16px] animate-bounce-in-loop" style={{ animationDelay: "0.3s" }}>👥</div>
-                  <h4 className="text-[20px] font-extrabold text-[#1b1c1a] mb-[12px]">
-                    Never Meet Alone
-                  </h4>
-                  <p className="text-[16px] text-[#697969]">
-                    Bring your friends. The group dynamic creates safer, more natural conversations than one-on-one interactions.
-                  </p>
-                </div>
-
-                <div
-                  className="bg-white rounded-[12px] p-[32px] animate-fade-in-up-loop hover:shadow-lg transition-all duration-300 hover:translate-y-[-8px]"
-                  style={{ animationDelay: "0.2s" }}
-                >
-                  <div className="text-[48px] mb-[16px] animate-bounce-in-loop" style={{ animationDelay: "0.4s" }}>🎯</div>
-                  <h4 className="text-[20px] font-extrabold text-[#1b1c1a] mb-[12px]">
-                    Squad Matching
-                  </h4>
-                  <p className="text-[16px] text-[#697969]">
-                    Get paired with squads of similar size. Our algorithm ensures you meet groups that match your vibe.
-                  </p>
-                </div>
-
-                <div
-                  className="bg-white rounded-[12px] p-[32px] animate-fade-in-up-loop hover:shadow-lg transition-all duration-300 hover:translate-y-[-8px]"
-                  style={{ animationDelay: "0.3s" }}
-                >
-                  <div className="text-[48px] mb-[16px] animate-bounce-in-loop" style={{ animationDelay: "0.5s" }}>🛡️</div>
-                  <h4 className="text-[20px] font-extrabold text-[#1b1c1a] mb-[12px]">
-                    Moderated & Safe
-                  </h4>
-                  <p className="text-[16px] text-[#697969]">
-                    Real-time content detection and community standards ensure your squad has a respectful, premium experience.
-                  </p>
-                </div>
-              </div>
+            <div className="mb-8">
+              <RotatingHeadline />
             </div>
-          </section>
 
-          {/* Feature Details Section */}
-          <section className="py-[96px]">
-            <div className="max-w-[1280px] mx-auto px-[32px]">
-              <div className="mb-[64px] animate-fade-in-up-loop">
-                <h3 className="text-[56px] font-extrabold text-[#1b1c1a] leading-[64px] mb-[16px]">
-                  How Giggle Works
-                </h3>
-                <p className="text-[18px] text-[#697969]">
-                  Three simple steps to connect your squad with others.
-                </p>
-              </div>
+            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-400 leading-relaxed max-w-3xl mx-auto mb-12">
+              Bring your friends into a private shared lobby and "collide" with another squad in real-time synchronized video encounters. 
+              <span className="block mt-4 font-semibold text-gray-900 dark:text-white italic">Groups discovery, reimagined.</span>
+            </p>
 
-              {/* Features Grid */}
-              <div className="grid grid-cols-2 gap-[48px]">
-                <div className="bg-white rounded-[12px] p-[32px] border border-[rgba(0,0,0,0.05)] animate-fade-in-up-loop hover:shadow-lg transition-all duration-300 hover:translate-y-[-8px]" style={{ animationDelay: "0.1s" }}>
-                  <div className="overflow-hidden rounded-[8px] mb-[24px] h-[200px]">
-                    <img
-                      src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=400&fit=crop"
-                      alt="Squad Lobby"
-                      className="w-full h-full object-cover hover:scale-110 transition-transform duration-700"
-                    />
-                  </div>
-                  <h4 className="text-[24px] font-extrabold text-[#1b1c1a] mb-[8px]">
-                    The Squad Lobby
-                  </h4>
-                  <p className="text-[16px] text-[#697969] mb-[16px]">
-                    Create a unique Squad code and invite your friends. See their cameras in real-time before you start searching for a match.
-                  </p>
-                  <ul className="text-[14px] text-[#697969] space-y-[8px]">
-                    <li className="animate-fade-in-up-loop" style={{ animationDelay: "0.4s" }}>✓ 6-digit Squad Code</li>
-                    <li className="animate-fade-in-up-loop" style={{ animationDelay: "0.5s" }}>✓ Real-time member sync</li>
-                    <li className="animate-fade-in-up-loop" style={{ animationDelay: "0.6s" }}>✓ Camera/mic permissions check</li>
-                  </ul>
-                </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => signIn("google")}
+              className="px-10 py-5 bg-[#516051] dark:bg-[#697969] text-white rounded-2xl font-black text-lg shadow-2xl shadow-[#516051]/30 hover:bg-[#405040] transition-all flex items-center gap-3 mx-auto"
+            >
+              Start a Squad Lobby
+              <Users size={20} />
+            </motion.button>
+          </motion.div>
+        </div>
 
-                <div className="bg-white rounded-[12px] p-[32px] border border-[rgba(0,0,0,0.05)] animate-fade-in-up-loop hover:shadow-lg transition-all duration-300 hover:translate-y-[-8px]" style={{ animationDelay: "0.2s" }}>
-                  <div className="overflow-hidden rounded-[8px] mb-[24px] h-[200px]">
-                    <img
-                      src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=400&fit=crop"
-                      alt="Video Encounter"
-                      className="w-full h-full object-cover hover:scale-110 transition-transform duration-700"
-                    />
-                  </div>
-                  <h4 className="text-[24px] font-extrabold text-[#1b1c1a] mb-[8px]">
-                    The Video Encounter
-                  </h4>
-                  <p className="text-[16px] text-[#697969] mb-[16px]">
-                    Hit "Find a Match" and get paired instantly with another squad. Your squad appears on the left, theirs on the right—high-fidelity video, zero chaos.
-                  </p>
-                  <ul className="text-[14px] text-[#697969] space-y-[8px]">
-                    <li className="animate-fade-in-up-loop" style={{ animationDelay: "0.5s" }}>✓ Instant matchmaking</li>
-                    <li className="animate-fade-in-up-loop" style={{ animationDelay: "0.6s" }}>✓ Synchronized transition</li>
-                    <li className="animate-fade-in-up-loop" style={{ animationDelay: "0.7s" }}>✓ Smart video grid layout</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </section>
+        <motion.div 
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 1 }}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce opacity-50"
+        >
+          <div className="w-6 h-10 border-2 border-[#516051] rounded-full flex justify-center pt-2">
+            <div className="w-1 h-2 bg-[#516051] rounded-full" />
+          </div>
+        </motion.div>
+      </section>
 
-          {/* Process Steps Section */}
-          <section className="bg-[#f5f3f0] py-[96px]">
-            <div className="max-w-[1280px] mx-auto px-[32px]">
-              <h3 className="text-[48px] font-extrabold text-[#1b1c1a] text-center mb-[64px] animate-fade-in-up-loop">
-                <AnimatedText text="Your Squad's Journey in Three Steps" className="text-[48px] font-extrabold text-[#1b1c1a]" delay={100} />
+      {/* The Concept: Squad to Squad */}
+      <section className="py-32 px-6 border-y border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-20 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="space-y-8"
+            >
+              <h3 className="text-4xl md:text-5xl font-black leading-tight">
+                Traditional video chat is lonely. <br />
+                <span className="text-[#516051] dark:text-[#7f9b8f]">Discovery is better with friends.</span>
               </h3>
-
-              <div className="grid grid-cols-3 gap-[48px]">
-                <div className="flex flex-col items-center text-center animate-fade-in-up-loop hover:transform hover:scale-105 transition-transform duration-300" style={{ animationDelay: "0.1s" }}>
-                  <div className="w-[80px] h-[80px] rounded-full bg-gradient-to-br from-[#516051] to-[#697969] flex items-center justify-center mb-[24px] border-4 border-white shadow-lg animate-bounce-in-loop" style={{ animationDelay: "0.3s" }}>
-                    <span className="text-[36px] font-bold text-white">1</span>
-                  </div>
-                  <h4 className="text-[20px] font-extrabold text-[#1b1c1a] mb-[12px]">
-                    Create & Invite
-                  </h4>
-                  <p className="text-[16px] text-[#697969]">
-                    Generate a Squad code and share it with your friends. They join instantly—no separate login needed.
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-center text-center animate-fade-in-up-loop hover:transform hover:scale-105 transition-transform duration-300" style={{ animationDelay: "0.2s" }}>
-                  <div className="w-[80px] h-[80px] rounded-full bg-gradient-to-br from-[#516051] to-[#697969] flex items-center justify-center mb-[24px] border-4 border-white shadow-lg animate-bounce-in-loop" style={{ animationDelay: "0.4s" }}>
-                    <span className="text-[36px] font-bold text-white">2</span>
-                  </div>
-                  <h4 className="text-[20px] font-extrabold text-[#1b1c1a] mb-[12px]">
-                    Prepare Together
-                  </h4>
-                  <p className="text-[16px] text-[#697969]">
-                    See your friends' cameras, chat, and prep your introduction. When everyone's ready, hit "Find a Match."
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-center text-center animate-fade-in-up-loop hover:transform hover:scale-105 transition-transform duration-300" style={{ animationDelay: "0.3s" }}>
-                  <div className="w-[80px] h-[80px] rounded-full bg-gradient-to-br from-[#516051] to-[#697969] flex items-center justify-center mb-[24px] border-4 border-white shadow-lg animate-bounce-in-loop" style={{ animationDelay: "0.5s" }}>
-                    <span className="text-[36px] font-bold text-white">3</span>
-                  </div>
-                  <h4 className="text-[20px] font-extrabold text-[#1b1c1a] mb-[12px]">
-                    Meet & Connect
-                  </h4>
-                  <p className="text-[16px] text-[#697969]">
-                    Your squad instantly connects with another. Exchange stories, ideas, or even add friends for life. Skip anytime.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Platform Promise Section */}
-          <section className="py-[96px]">
-            <div className="max-w-[1280px] mx-auto px-[32px]">
-              <div className="bg-gradient-to-r from-[#516051] to-[#697969] rounded-[16px] p-[64px] text-center text-white animate-fade-in-up-loop hover:shadow-2xl transition-all duration-500">
-                <h3 className="text-[48px] font-extrabold mb-[24px] leading-[56px]">
-                  <AnimatedText text="Premium Squad Discovery" className="text-[48px] font-extrabold text-white" delay={200} />
-                </h3>
-                <p className="text-[18px] leading-[28px] mb-[32px] opacity-95 animate-fade-in-up-loop" style={{ animationDelay: "0.3s" }}>
-                  Giggle is built for groups who want to meet groups. No solo stranger chats. No doom-scrolling. No performance anxiety about one-on-one connections. Just authentic squad-to-squad encounters with real people, real conversations, and real potential for new friendships.
-                </p>
-                <p className="text-[16px] opacity-85 italic animate-fade-in-up-loop" style={{ animationDelay: "0.4s" }}>
-                  "Because the best conversations happen when your friends are by your side."
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Final CTA Section */}
-          <section className="bg-[#f5f3f0] py-[96px]">
-            <div className="max-w-[1280px] mx-auto px-[32px] text-center">
-              <h3 className="text-[48px] font-extrabold text-[#1b1c1a] leading-[56px] mb-[24px] animate-fade-in-up-loop">
-                <AnimatedText text="Ready to Squad up?" className="text-[48px] font-extrabold text-[#1b1c1a]" delay={100} />
-              </h3>
-              <p className="text-[18px] text-[#697969] mb-[48px] animate-fade-in-up-loop" style={{ animationDelay: "0.3s" }}>
-                Sign in with Google to create your first squad. It takes less than 30 seconds.
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Solo chatting with strangers can be awkward and unsafe. Giggle changes the dynamic by pairing entire **Squads**. Whether you're a duo or a group of four, we match you with a group of similar size for an authentic social experience.
               </p>
-              <form
-                action={async () => {
-                  "use server";
-                  await signIn("google");
-                }}
-                className="animate-fade-in-up-loop"
-                style={{ animationDelay: "0.4s" }}
-              >
-                <button className="px-[40px] py-[16px] bg-gradient-to-br from-[#516051] to-[#697969] text-white rounded-[8px] font-semibold hover:shadow-lg transition-all shadow-md hover:scale-110 active:scale-95 text-[18px]">
-                  Get Started
-                </button>
-              </form>
+
+              <div className="grid sm:grid-cols-2 gap-6">
+                {[
+                  { icon: ShieldCheck, title: "Built-in Safety", desc: "Group dynamics naturally deter toxic behavior." },
+                  { icon: Target, title: "Vibe Matching", desc: "Use Vibe Tags to find squads with similar interests." },
+                ].map((item, idx) => (
+                  <div key={idx} className="p-6 rounded-2xl bg-[#f7faf6] dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                    <item.icon className="text-[#516051] mb-4" size={28} />
+                    <h4 className="font-bold mb-2">{item.title}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, rotate: 2 }}
+              whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
+              viewport={{ once: true }}
+              className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl shadow-[#516051]/20 border-8 border-white dark:border-gray-800"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-[#516051]/20 to-transparent z-10" />
+              <img 
+                src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=1200&h=800&fit=crop" 
+                alt="Friends having fun" 
+                className="w-full h-full object-cover grayscale-[0.2] hover:grayscale-0 transition-all duration-700"
+              />
+              <div className="absolute bottom-6 left-6 right-6 p-4 rounded-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur shadow-lg z-20">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+                  <p className="text-sm font-bold uppercase tracking-widest text-[#516051] dark:text-gray-300">Live Collision</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">2 Squads | 8 Participants | #Gaming #College</p>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* The Journey: How it works */}
+      <section className="py-32 px-6 bg-[#f7faf6] dark:bg-gray-950">
+        <div className="max-w-5xl mx-auto text-center mb-20">
+          <motion.h3 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-4xl md:text-6xl font-black mb-6"
+          >
+            How Your Squad Meets
+          </motion.h3>
+          <p className="text-gray-500 dark:text-gray-400 text-lg">Three steps from lobby to collision.</p>
+        </div>
+
+        <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-12">
+          {[
+            { 
+              step: "01", 
+              title: "Lobby Up", 
+              desc: "Create a private lobby. Invite your friends via a 6-digit code. Hang out and prep your squad's vibe.",
+              icon: Users
+            },
+            { 
+              step: "02", 
+              title: "Set Your Vibe", 
+              desc: "Select Vibe Tags to tell the algorithm what you're interested in. Our engine shards global traffic for low latency.",
+              icon: Target
+            },
+            { 
+              step: "03", 
+              title: "Collision", 
+              desc: "Hit 'Find Match' to initiate a collision. A 3-second cinematic countdown leads to a synchronized reveal.",
+              icon: Zap
+            }
+          ].map((item, idx) => (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.2 }}
+              key={idx}
+              className="relative p-10 rounded-[32px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xl shadow-[#516051]/5 hover:shadow-[#516051]/10 transition-all group"
+            >
+              <div className="absolute -top-6 left-10 text-6xl font-black text-[#516051]/10 dark:text-gray-800 group-hover:text-[#516051]/20 transition-colors">
+                {item.step}
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-[#516051] text-white flex items-center justify-center mb-8 rotate-3 group-hover:rotate-0 transition-transform">
+                <item.icon size={28} />
+              </div>
+              <h4 className="text-2xl font-black mb-4">{item.title}</h4>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                {item.desc}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* Tech Promise: Scaling Section */}
+      <section className="py-32 px-6">
+        <div className="max-w-7xl mx-auto rounded-[48px] bg-gradient-to-br from-[#516051] to-[#1a2119] p-12 md:p-24 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-full h-full opacity-10 pointer-events-none">
+             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white rounded-full blur-[160px]" />
+          </div>
+
+          <div className="max-w-3xl relative z-10">
+            <h3 className="text-4xl md:text-6xl font-black mb-8 leading-tight italic">
+              Premium Discovery. <br />
+              No Junk. No Bots.
+            </h3>
+            <p className="text-xl md:text-2xl text-gray-300 leading-relaxed mb-12">
+              Giggle is built on high-scale, Redis-backed infrastructure. We utilize geo-sharded matchmaking and Redlock atomic pairing to ensure you connect with real squads, instantly, anywhere in the world.
+            </p>
+
+            <div className="flex flex-wrap gap-10">
+              <div className="flex items-center gap-3">
+                <Zap size={24} className="text-[#7f9b8f]" />
+                <span className="font-bold uppercase tracking-widest text-sm">Real-time Signaling</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Lock size={24} className="text-[#7f9b8f]" />
+                <span className="font-bold uppercase tracking-widest text-sm">Atomic Handshakes</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Target size={24} className="text-[#7f9b8f]" />
+                <span className="font-bold uppercase tracking-widest text-sm">Region Aware</span>
+              </div>
             </div>
-          </section>
-        </main>
-      ) : (
-        <LobbyClient
-          backendToken={session.backendToken || ""}
-          userName={session.user?.name || "User"}
-          userImage={session.user?.image}
-        />
-      )}
-    </>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer / Final CTA */}
+      <section className="py-32 px-6 text-center border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          className="max-w-2xl mx-auto"
+        >
+          <h3 className="text-5xl font-black mb-6">Ready to Squad Up?</h3>
+          <p className="text-gray-500 dark:text-gray-400 text-lg mb-12 leading-relaxed">
+            Create your lobby, invite your best friends, and find your twin squad across the globe.
+          </p>
+          <button
+            onClick={() => signIn("google")}
+            className="px-12 py-5 bg-[#516051] text-white rounded-2xl font-black text-xl hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-[#516051]/20"
+          >
+            Sign in with Google
+          </button>
+
+          <div className="mt-20 flex flex-col items-center gap-4 border-t border-gray-100 dark:border-gray-900 pt-10">
+            <div className="text-[#516051] font-black text-2xl tracking-tighter">giggle.</div>
+            <p className="text-gray-400 text-xs tracking-[0.2em] uppercase font-bold">© 2026 Giggle Tech • All rights reserved</p>
+          </div>
+        </motion.div>
+      </section>
+    </div>
   );
 }

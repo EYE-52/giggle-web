@@ -72,6 +72,14 @@ export const updateSquadName = (token: string, squadId: string, squadName: strin
   });
 };
 
+export const updateSquadTags = (token: string, squadId: string, tags: string[]) => {
+  return backendRequest<{ squadId: string; tags: string[] }>(`/api/squads/${squadId}/tags`, {
+    method: "POST",
+    token,
+    body: { tags },
+  });
+};
+
 export const startSearch = (token: string, squadId: string) => {
   return backendRequest<SearchResponse>(`/api/squads/${squadId}/search`, {
     method: "POST",

@@ -23,12 +23,15 @@ import {
   skipEncounter,
   startSearch,
   updateSquadName,
+  updateSquadTags,
 } from "@/lib/api/squad";
 import { BackendApiError } from "@/lib/api/client";
 import type { EncounterHandoffResponse, MatchmakingStatusResponse, SquadState } from "@/types/giggle";
 import { useSquadLobbyAgora } from "@/lib/agora/useSquadLobbyAgora";
 import { CameraStateIcon, MicStateIcon, VideoTile } from "@/components/lobby/VideoTile";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Props = {
   backendToken: string;
@@ -56,7 +59,10 @@ const toneClassMap: Record<ActionIconButtonProps["tone"], string> = {
 
 function ActionIconButton({ label, title, onClick, disabled, tone, icon }: ActionIconButtonProps) {
   return (
-    <button
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
       className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl disabled:opacity-50 ${toneClassMap[tone]}`}
       onClick={onClick}
       disabled={disabled}
@@ -65,7 +71,7 @@ function ActionIconButton({ label, title, onClick, disabled, tone, icon }: Actio
     >
       {icon}
       <span className="text-[10px] leading-tight font-medium text-center whitespace-nowrap">{label}</span>
-    </button>
+    </motion.button>
   );
 }
 
@@ -217,6 +223,7 @@ const toSquadState = (data: {
   status: SquadState["status"];
   members: SquadState["members"];
   leaderMemberId?: string | null;
+  tags?: string[];
 }): SquadState => {
   return {
     squadId: data.squadId,
@@ -225,12 +232,33 @@ const toSquadState = (data: {
     status: data.status,
     members: data.members,
     leaderMemberId: data.leaderMemberId || undefined,
+    tags: data.tags || [],
   };
+};
+
+const getVibeColors = (tags: string[] = []) => {
+  const mapping: Record<string, string> = {
+    gaming: "#1e3a8a",   // deep blue
+    music: "#581c87",    // deep purple
+    deeptalk: "#134e4a", // deep teal
+    college: "#78350f",  // deep amber
+    party: "#831843",    // deep pink
+    chill: "#1e293b",    // slate
+  };
+  
+  const colors = tags
+    .map(t => mapping[t.toLowerCase()])
+    .filter(Boolean);
+    
+  if (colors.length === 0) return ["#0f172a", "#111827"]; 
+  if (colors.length === 1) return [colors[0], "#0f172a"];
+  return colors.slice(0, 2);
 };
 
 export function LobbyClient({ backendToken, userName, userImage }: Props) {
   const [displayName, setDisplayName] = useState(userName || "");
   const [newSquadName, setNewSquadName] = useState("");
+  const [tagInput, setTagInput] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [squad, setSquad] = useState<SquadState | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -238,6 +266,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
   const [joiningAgora, setJoiningAgora] = useState(false);
   const [matchStatus, setMatchStatus] = useState<MatchmakingStatusResponse | null>(null);
   const [handoffStatus, setHandoffStatus] = useState<EncounterHandoffResponse | null>(null);
+  const [isRevealing, setIsRevealing] = useState(false);
+  const [revealCountdown, setRevealCountdown] = useState(0);
 
   const {
     joined,
@@ -251,6 +281,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     leaveLobby,
     toggleMic,
     toggleVideo,
+    speakingUsers,
+    networkQuality,
   } = useSquadLobbyAgora();
 
   const myMember = useMemo(() => {
@@ -294,6 +326,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
       const remoteUser = remoteUsersByUid.get(uid);
       const track = isSelf ? localVideoTrack : remoteUser?.videoTrack || null;
       const micOn = isSelf ? Boolean(joined && isMicOn) : Boolean(remoteUser?.audioTrack);
+      const isSpeaking = speakingUsers.has(uid);
+      const quality = networkQuality[uid] || networkQuality[0] || 0;
       const showVideo = isSelf ? Boolean(localVideoTrack && isVideoOn) : Boolean(remoteUser?.videoTrack);
       const onlineText = isInEncounterChannel ? "In encounter room" : "In video lobby";
       const offlineText = isInEncounterChannel ? "Not in encounter room" : "Not in video lobby";
@@ -310,6 +344,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
         micOn,
         track,
         showVideo,
+        isSpeaking,
+        networkQuality: quality,
       };
     });
 
@@ -330,6 +366,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
           micOn: Boolean(remoteUser.audioTrack),
           track: remoteUser.videoTrack || null,
           showVideo: Boolean(remoteUser.videoTrack),
+          isBlurred: isRevealing,
+          isSpeaking: speakingUsers.has(numericUid),
+          networkQuality: networkQuality[numericUid] || 0,
         };
       });
 
@@ -346,6 +385,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     squad,
     uidScope,
     uidToDisplayName,
+    isRevealing,
+    speakingUsers,
+    networkQuality,
   ]);
 
   const encounterSplitTiles = useMemo(() => {
@@ -359,11 +401,14 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
       knownUids.add(uid);
       const isSelf = member.memberId === myMember?.memberId;
       const remoteUser = remoteUsersByUid.get(uid);
+      const isSpeaking = speakingUsers.has(uid);
+      const quality = networkQuality[uid] || networkQuality[0] || 0;
       const track = isSelf ? localVideoTrack : remoteUser?.videoTrack || null;
       const micOn = isSelf ? Boolean(joined && isMicOn) : Boolean(remoteUser?.audioTrack);
       const showVideo = isSelf ? Boolean(localVideoTrack && isVideoOn) : Boolean(remoteUser?.videoTrack);
       const onlineText = isInEncounterChannel ? "In encounter room" : "In video lobby";
       const offlineText = isInEncounterChannel ? "Not in encounter room" : "Not in video lobby";
+      // If we are not in Agora ourselves, use the backend-tracked inLobbyVideo flag
       const remoteOnline = joined ? Boolean(remoteUser) : Boolean(member.inLobbyVideo);
       const presence = isSelf ? (joined ? onlineText : offlineText) : remoteOnline ? onlineText : offlineText;
 
@@ -376,6 +421,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
         micOn,
         track,
         showVideo,
+        isSpeaking,
+        networkQuality: quality,
       };
     });
 
@@ -392,6 +439,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
           micOn: Boolean(remoteUser.audioTrack),
           track: remoteUser.videoTrack || null,
           showVideo: Boolean(remoteUser.videoTrack),
+          isBlurred: isRevealing,
+          isSpeaking: speakingUsers.has(numericUid),
+          networkQuality: networkQuality[numericUid] || 0,
         };
       });
 
@@ -408,6 +458,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     squad,
     uidScope,
     uidToDisplayName,
+    isRevealing,
+    speakingUsers,
+    networkQuality,
   ]);
 
   const ownEncounterSquadName = matchStatus?.match?.ownSquadName || squad?.squadName || "Your squad";
@@ -434,6 +487,25 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     [backendToken]
   );
 
+  const refreshMatchStatus = useCallback(async () => {
+    if (!squad?.squadId) return;
+    try {
+      const status = await getMatchmakingStatus(backendToken, squad.squadId);
+      setMatchStatus(status);
+
+      const activeEncounterId = status.match?.encounterId;
+      if (activeEncounterId) {
+        const handoff = await getEncounterHandoffStatus(backendToken, activeEncounterId);
+        setHandoffStatus(handoff);
+      } else {
+        setHandoffStatus(null);
+      }
+    } catch {
+      setMatchStatus(null);
+      setHandoffStatus(null);
+    }
+  }, [backendToken, squad?.squadId]);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -448,6 +520,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
             status: result.status || "idle",
             members: result.members || [],
             leaderMemberId: result.leaderMemberId || undefined,
+            tags: result.tags,
           })
         );
       } catch (error) {
@@ -459,76 +532,58 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     void load();
   }, [backendToken]);
 
-  useEffect(() => {
-    if (!squad?.squadId) {
-      setMatchStatus(null);
-      setHandoffStatus(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const refreshMatchStatus = async () => {
-      try {
-        const status = await getMatchmakingStatus(backendToken, squad.squadId);
-        if (cancelled) return;
-        setMatchStatus(status);
-
-        const activeEncounterId = status.match?.encounterId;
-        if (activeEncounterId) {
-          const handoff = await getEncounterHandoffStatus(backendToken, activeEncounterId);
-          if (!cancelled) {
-            setHandoffStatus(handoff);
-          }
-        } else if (!cancelled) {
-          setHandoffStatus(null);
-        }
-      } catch {
-        if (!cancelled) {
-          setMatchStatus(null);
-          setHandoffStatus(null);
-        }
-      }
-    };
-
-    void refreshMatchStatus();
-    const intervalId = setInterval(() => {
-      void refreshMatchStatus();
-    }, 3000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(intervalId);
-    };
-  }, [backendToken, squad?.squadId]);
-
-  // Always keep squad in sync while in a squad, even when not in video.
+  // WebSocket Setup
   useEffect(() => {
     if (!squad?.squadId) return;
 
-    let cancelled = false;
+    const socket = connectSocket(squad.squadId);
 
-    const syncSquad = async () => {
-      try {
-        const next = await getSquadById(backendToken, squad.squadId);
-        if (!cancelled) {
-          setSquad(next);
-        }
-      } catch {
-        // Keep lobby usable even if an occasional sync request fails.
-      }
-    };
+    socket.on("MATCH_FOUND", (data) => {
+      console.log("Match found event received:", data);
+      setMessage(`Match found with ${data.opponentSquadName}!`);
+      void refreshMatchStatus();
+      void refreshSquad(squad.squadId);
+    });
 
-    void syncSquad();
-    const intervalId = setInterval(() => {
-      void syncSquad();
-    }, 2000);
+    socket.on("ENCOUNTER_ACTIVE", (data) => {
+      console.log("Encounter active event received:", data);
+      void refreshMatchStatus();
+      void refreshSquad(squad.squadId);
+    });
+
+    socket.on("ENCOUNTER_ENDED", (data) => {
+      console.log("Encounter ended event received:", data);
+      setMessage("Encounter ended.");
+      setMatchStatus(null);
+      setHandoffStatus(null);
+      void refreshSquad(squad.squadId);
+    });
+
+    socket.on("SQUAD_UPDATED", () => {
+      void refreshSquad(squad.squadId);
+    });
 
     return () => {
-      cancelled = true;
-      clearInterval(intervalId);
+      socket.off("MATCH_FOUND");
+      socket.off("ENCOUNTER_ACTIVE");
+      socket.off("ENCOUNTER_ENDED");
+      socket.off("SQUAD_UPDATED");
+      disconnectSocket();
     };
-  }, [backendToken, squad?.squadId]);
+  }, [squad?.squadId, refreshMatchStatus, refreshSquad]);
+
+  // Fallback Polling (Reduced frequency)
+  useEffect(() => {
+    if (!squad?.squadId) return;
+
+    const intervalId = setInterval(() => {
+      void refreshMatchStatus();
+      void refreshSquad(squad.squadId);
+    }, 10000); // 10 seconds fallback
+
+    return () => clearInterval(intervalId);
+  }, [refreshMatchStatus, refreshSquad, squad?.squadId]);
+
 
   // Immediately re-sync squad whenever the Agora remote-user list changes
   // (someone joins or leaves video lobby) so tiles update without waiting for
@@ -692,6 +747,26 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     void autoRejoinLobby();
   }, [joined, currentChannelName, matchStatus?.match?.encounterId, backendToken, squad?.squadId, leaveLobby, joinLobby]);
 
+  // Trigger reveal when entering encounter
+  const prevChannelRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentChannelName?.startsWith("encounter_") && !prevChannelRef.current?.startsWith("encounter_")) {
+      setIsRevealing(true);
+      setRevealCountdown(3);
+      const timer = setInterval(() => {
+        setRevealCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setIsRevealing(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    prevChannelRef.current = currentChannelName;
+  }, [currentChannelName]);
+
 
   const onCreateSquad = async () => {
     setLoading(true);
@@ -779,6 +854,40 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     }
   };
 
+  const onUpdateTags = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!squad || !isLeader || !tagInput.trim()) return;
+
+    setLoading(true);
+    try {
+      const newTags = [...(squad.tags || []), tagInput.trim().substring(0, 15)].slice(-5);
+      await updateSquadTags(backendToken, squad.squadId, newTags);
+      await refreshSquad(squad.squadId);
+      setTagInput("");
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRemoveTag = async (tagToRemove: string) => {
+    if (!squad || !isLeader) return;
+
+    setLoading(true);
+    try {
+      const newTags = (squad.tags || []).filter(t => t !== tagToRemove);
+      await updateSquadTags(backendToken, squad.squadId, newTags);
+      await refreshSquad(squad.squadId);
+    } catch (error) {
+      const err = error as BackendApiError;
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onStartSearch = async () => {
     if (!squad) return;
     setLoading(true);
@@ -786,7 +895,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     try {
       await startSearch(backendToken, squad.squadId);
       await refreshSquad(squad.squadId);
-      setMessage("Matchmaking started. In Phase 1 this is state-only.");
+      setMessage("Matchmaking started.");
     } catch (error) {
       const err = error as BackendApiError;
       setMessage(err.message);
@@ -964,20 +1073,32 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     }
   };
 
+  const vibeColors = useMemo(() => getVibeColors(squad?.tags), [squad?.tags]);
+
   return (
-    <main className="h-screen flex flex-col landing-shell overflow-hidden bg-gray-900 dark:bg-gray-900">
+    <motion.main 
+      animate={{ 
+        background: `radial-gradient(circle at top left, ${vibeColors[0]}, ${vibeColors[1]})` 
+      }}
+      transition={{ duration: 2 }}
+      className="h-screen flex flex-col landing-shell overflow-hidden"
+    >
       <header className="shrink-0 landing-header border-b border-[rgba(255,255,255,0.1)] dark:border-gray-700 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {userImage ? (
-            <img src={userImage} alt="profile" className="h-8 w-8 rounded-full" />
-          ) : (
-            <div className="h-8 w-8 rounded-full bg-[#516051] dark:bg-[#697969] flex items-center justify-center text-white text-sm font-semibold shrink-0">
-              {userName?.charAt(0).toUpperCase() ?? "?"}
+        <div className="flex items-center gap-6">
+          <div className="text-white font-black text-2xl tracking-tighter">giggle.</div>
+          <div className="w-px h-8 bg-white/10 hidden md:block" />
+          <div className="flex items-center gap-3">
+            {userImage ? (
+              <img src={userImage} alt="profile" className="h-8 w-8 rounded-full" />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-[#516051] dark:bg-[#697969] flex items-center justify-center text-white text-sm font-semibold shrink-0">
+                {userName?.charAt(0).toUpperCase() ?? "?"}
+              </div>
+            )}
+            <div>
+              <p className="text-[10px] text-[#f0f2ec] dark:text-gray-300 font-bold uppercase tracking-widest opacity-60">High-Scale Session</p>
+              <h1 className="font-semibold text-sm text-white dark:text-gray-100">Welcome, {userName}</h1>
             </div>
-          )}
-          <div>
-            <p className="text-xs text-[#f0f2ec] dark:text-gray-300">Giggle Phase 1 Lobby Demo</p>
-            <h1 className="font-semibold text-sm text-white dark:text-gray-100">Welcome, {userName}</h1>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -1043,37 +1164,75 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                 Invite code: <span className="font-semibold text-gray-900 dark:text-gray-100">{squad.squadCode}</span>
               </div>
 
-              <div className="text-xs text-[#3e443d] dark:text-gray-400 rounded-lg border border-[var(--border)] dark:border-gray-600 bg-[#efeeeb] dark:bg-gray-700 p-2">
-                Match state: <span className="font-medium text-gray-900 dark:text-gray-100">{matchStatus?.state || squad.status}</span>
-                {matchStatus?.queue ? ` | Queue wait: ${matchStatus.queue.waitSeconds}s` : ""}
-                {encounterId ? ` | Encounter: ${encounterId}` : ""}
+              {/* Tag Display */}
+              <div className="flex flex-wrap gap-1 mt-1">
+                {(squad.tags || []).map(tag => (
+                  <span key={tag} className="text-[10px] bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-200 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                    #{tag}
+                    {isLeader && (
+                      <button onClick={() => onRemoveTag(tag)} className="hover:text-rose-500">×</button>
+                    )}
+                  </span>
+                ))}
+              </div>
+
+              <div className="text-xs text-gray-500 dark:text-gray-400 rounded-lg border border-[var(--border)] dark:border-gray-600 bg-[#efeeeb] dark:bg-gray-700/50 p-2">
+                Match state: <span className="font-bold text-gray-900 dark:text-gray-100 uppercase tracking-tight">{matchStatus?.state || squad.status}</span>
+                {matchStatus?.queue ? ` | Region: ${matchStatus.queue.region}` : ""}
+                {encounterId ? ` | Enc: ${encounterId.slice(-4)}` : ""}
               </div>
 
               {encounterId && matchStatus?.match ? (
-                <div className="text-xs text-[#3b5f57] dark:text-green-400 rounded-lg border border-[#cde2da] dark:border-green-600 bg-[#eef5f1] dark:bg-green-900 p-2">
-                  Encounter room: <span className="font-semibold text-gray-900 dark:text-gray-100">{matchStatus.match.ownSquadName}</span>
+                <div className="text-xs text-emerald-700 dark:text-emerald-400 rounded-lg border border-[#cde2da] dark:border-emerald-600/50 bg-[#eef5f1] dark:bg-emerald-900/20 p-2">
+                  Collision: <span className="font-bold text-gray-900 dark:text-gray-100">{matchStatus.match.ownSquadName}</span>
                   {" vs "}
-                  <span className="font-semibold text-gray-900 dark:text-gray-100">{matchStatus.match.opponentSquadName}</span>
+                  <span className="font-bold text-gray-900 dark:text-gray-100">{matchStatus.match.opponentSquadName}</span>
                 </div>
               ) : null}
 
               {isLeader ? (
                 <div className="rounded-xl landing-panel border border-[var(--border)] dark:border-gray-600 bg-white dark:bg-gray-700 p-3 space-y-2">
-                  <div className="text-xs uppercase tracking-wide text-[#4a5d4f] dark:text-gray-300">Squad Name</div>
-                  <input
-                    className="w-full rounded-lg border border-[#c5c9c1] dark:border-gray-600 bg-white dark:bg-gray-600 p-2 text-sm text-gray-900 dark:text-gray-100"
-                    value={newSquadName}
-                    onChange={(e) => setNewSquadName(e.target.value)}
-                    placeholder={squad.squadName}
-                    maxLength={32}
-                  />
-                  <button
-                    className="w-full rounded-lg bg-[#516051] dark:bg-[#697969] px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-opacity-90 dark:hover:bg-opacity-80"
-                    onClick={onUpdateSquadName}
-                    disabled={loading || newSquadName.trim().length < 2}
-                  >
-                    Save
-                  </button>
+                  <div className="text-xs uppercase tracking-wide text-[#4a5d4f] dark:text-gray-300 font-bold">Leader Controls</div>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-gray-500 uppercase">Squad Name</label>
+                    <div className="flex gap-1">
+                      <input
+                        className="flex-1 rounded-lg border border-[#c5c9c1] dark:border-gray-600 bg-white dark:bg-gray-600 p-1.5 text-xs text-gray-900 dark:text-gray-100"
+                        value={newSquadName}
+                        onChange={(e) => setNewSquadName(e.target.value)}
+                        placeholder={squad.squadName}
+                        maxLength={32}
+                      />
+                      <button
+                        className="rounded-lg bg-[#516051] dark:bg-[#697969] px-2 py-1 text-[10px] text-white disabled:opacity-50"
+                        onClick={onUpdateSquadName}
+                        disabled={loading || newSquadName.trim().length < 2}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-gray-500 uppercase">Vibe Tags (Interests)</label>
+                    <form onSubmit={onUpdateTags} className="flex gap-1">
+                      <input
+                        className="flex-1 rounded-lg border border-[#c5c9c1] dark:border-gray-600 bg-white dark:bg-gray-600 p-1.5 text-xs text-gray-900 dark:text-gray-100"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        placeholder="e.g. Gaming"
+                        maxLength={15}
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-sky-600 px-2 py-1 text-[10px] text-white disabled:opacity-50"
+                        disabled={loading || !tagInput.trim() || (squad.tags || []).length >= 5}
+                      >
+                        Add
+                      </button>
+                    </form>
+                  </div>
                 </div>
               ) : null}
 
@@ -1091,7 +1250,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                   <ActionIconButton
                     label={joined ? "Leave video" : "Join video"}
                     onClick={joined ? onLeaveVideoLobby : onJoinLobbyVideo}
-                    disabled={joiningAgora || (joined && undefined) || (!joined && undefined)}
+                    disabled={joiningAgora}
                     tone={joined ? "slate" : "indigo"}
                     icon={joined ? <LeaveVideoIcon /> : <JoinVideoIcon />}
                   />
@@ -1133,8 +1292,6 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     />
                   ) : null}
 
-
-
                   {encounterId ? (
                     <ActionIconButton
                       label="Disconnect"
@@ -1163,9 +1320,6 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     icon={<LeaveSquadIcon />}
                   />
                 </div>
-                {/* <div className="text-xs text-slate-500">
-                  Hover an icon to see action name. {isLeader ? "Matchmaking is leader-only." : ""}
-                </div> */}
               </div>
 
 
@@ -1181,7 +1335,57 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                   <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "⚔ Encounter Room" : "Video Lobby"}</h3>
                   <span className="text-xs text-[#f0f2ec] dark:text-gray-300">{participantsCount} active</span>
                 </div>
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden relative">
+                  <AnimatePresence>
+                    {isRevealing && (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gray-900/80 backdrop-blur-xl transition-opacity duration-1000"
+                      >
+                        <div className="flex items-center gap-8 mb-8">
+                          <motion.div
+                            initial={{ x: -200, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            transition={{ type: "spring", delay: 0.2 }}
+                            className="text-right"
+                          >
+                            <p className="text-sky-400 text-xs uppercase tracking-widest font-bold mb-1">Your Squad</p>
+                            <h2 className="text-4xl font-black text-white uppercase italic">{ownEncounterSquadName}</h2>
+                          </motion.div>
+
+                          <motion.div
+                            initial={{ scale: 0, rotate: -180 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            transition={{ type: "spring", delay: 0.5 }}
+                            className="bg-white text-gray-900 w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+                          >
+                            VS
+                          </motion.div>
+
+                          <motion.div
+                            initial={{ x: 200, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            transition={{ type: "spring", delay: 0.2 }}
+                            className="text-left"
+                          >
+                            <p className="text-rose-400 text-xs uppercase tracking-widest font-bold mb-1">Opponent</p>
+                            <h2 className="text-4xl font-black text-white uppercase italic">{opponentEncounterSquadName}</h2>
+                          </motion.div>
+                        </div>
+
+                        <motion.div 
+                          initial={{ scale: 0.5, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          key={revealCountdown}
+                          className="text-9xl font-black text-white drop-shadow-[0_0_40px_rgba(255,255,255,0.4)]"
+                        >
+                          {revealCountdown}
+                        </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   {isInEncounterChannel ? (
                     // ── ENCOUNTER SPLIT SCREEN ──────────────────────────────────
                     <div className="h-full flex">
@@ -1211,6 +1415,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                               micOn={tile.micOn}
                               track={tile.track}
                               showVideo={tile.showVideo}
+                              isSpeaking={tile.isSpeaking}
+                              networkQuality={tile.networkQuality}
                             />
                           ))}
                         </div>
@@ -1221,9 +1427,24 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
 
                       {/* Opponent squad side */}
                       <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
-                        <div className="shrink-0 flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wide text-[#944147] dark:text-red-400 bg-[#f9dedf] dark:bg-red-900 rounded-full px-2 py-0.5">{opponentEncounterSquadName}</span>
-                          <span className="text-xs text-[#6a6c63] dark:text-gray-400">{encounterSplitTiles.opponentSquadTiles.length} member{encounterSplitTiles.opponentSquadTiles.length !== 1 ? "s" : ""}</span>
+                        <div className="shrink-0 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold uppercase tracking-wide text-[#944147] dark:text-red-400 bg-[#f9dedf] dark:bg-red-900 rounded-full px-2 py-0.5">{opponentEncounterSquadName}</span>
+                            <span className="text-xs text-[#6a6c63] dark:text-gray-400">{encounterSplitTiles.opponentSquadTiles.length} member{encounterSplitTiles.opponentSquadTiles.length !== 1 ? "s" : ""}</span>
+                          </div>
+                          {isLeader && (
+                            <button 
+                              onClick={() => {
+                                if (confirm("Report this squad for inappropriate behavior?")) {
+                                  getSocket().emit("report_squad", { squadId: matchStatus?.match?.opponentSquadId, reason: "Manual Report" });
+                                  setMessage("Squad reported. Our moderators are reviewing.");
+                                }
+                              }}
+                              className="text-[10px] font-bold text-rose-500 hover:text-rose-400 uppercase tracking-tighter"
+                            >
+                              Report
+                            </button>
+                          )}
                         </div>
                         {encounterSplitTiles.opponentSquadTiles.length > 0 ? (
                           <div
@@ -1246,6 +1467,9 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                                 micOn={tile.micOn}
                                 track={tile.track}
                                 showVideo={tile.showVideo}
+                                isBlurred={tile.isBlurred}
+                                isSpeaking={tile.isSpeaking}
+                                networkQuality={tile.networkQuality}
                               />
                             ))}
                           </div>
@@ -1277,6 +1501,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                                 micOn={tile.micOn}
                                 track={tile.track}
                                 showVideo={tile.showVideo}
+                                isSpeaking={tile.isSpeaking}
+                                networkQuality={tile.networkQuality}
                               />
                             ))}
                         </div>
@@ -1294,50 +1520,59 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                   <span className="text-xs text-[#4a6b5f] dark:text-gray-300 font-medium">{squad.members?.length ?? 0}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                  {(squad.members ?? []).map((member) => {
-                    const tile = videoTiles.find((t) => t.key === member.memberId);
-                    const inVideo = tile?.presence === "In video lobby" || tile?.presence === "In encounter room";
-                    const isMe = member.memberId === myMember?.memberId;
-                    return (
-                      <div key={member.memberId} className="rounded-lg border border-[var(--border)] bg-[#efeeeb] px-2 py-2 space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`h-2 w-2 rounded-full shrink-0 ${inVideo ? "bg-emerald-500" : "bg-[#c5c9c1]"}`}
-                            title={inVideo ? "In video" : "Not in video"}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{member.displayName || member.userId}</div>
-                            <div className="flex gap-1 mt-0.5 flex-wrap">
-                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${member.role === "leader" ? "bg-[#eef2ec] text-[#35513f]" : "bg-[#f1f2ed] text-[#6a6c63]"}`}>
-                                {member.role}
-                              </span>
-                              {member.ready ? (
-                                <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">ready</span>
-                              ) : null}
+                  <AnimatePresence mode="popLayout">
+                    {(squad.members ?? []).map((member) => {
+                      const tile = videoTiles.find((t) => t.key === member.memberId);
+                      const inVideo = tile?.presence === "In video lobby" || tile?.presence === "In encounter room";
+                      const isMe = member.memberId === myMember?.memberId;
+                      return (
+                        <motion.div 
+                          layout
+                          initial={{ x: -20, opacity: 0 }}
+                          animate={{ x: 0, opacity: 1 }}
+                          exit={{ x: 20, opacity: 0 }}
+                          key={member.memberId} 
+                          className="rounded-lg border border-[var(--border)] dark:border-gray-600 bg-[#efeeeb] dark:bg-gray-700 px-2 py-2 space-y-1.5 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`h-2 w-2 rounded-full shrink-0 ${inVideo ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-[#c5c9c1] dark:bg-gray-500"}`}
+                              title={inVideo ? "In video" : "Not in video"}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold truncate text-gray-900 dark:text-gray-100">{member.displayName || member.userId}</div>
+                              <div className="flex gap-1 mt-0.5 flex-wrap">
+                                <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-bold ${member.role === "leader" ? "bg-[#516051] text-white" : "bg-white/50 dark:bg-black/20 text-gray-600 dark:text-gray-400"}`}>
+                                  {member.role}
+                                </span>
+                                {member.ready ? (
+                                  <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400">ready</span>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        {isLeader && member.role !== "leader" ? (
-                          <div className="flex gap-1.5">
-                            <button
-                              className="flex-1 rounded-md bg-[#516051] px-2 py-1 text-xs text-white disabled:opacity-50"
-                              onClick={() => onPromoteMember(member.memberId)}
-                              disabled={loading || isMe}
-                            >
-                              Promote
-                            </button>
-                            <button
-                              className="flex-1 rounded-md bg-[#c53947] px-2 py-1 text-xs text-white disabled:opacity-50"
-                              onClick={() => onKickMember(member.memberId)}
-                              disabled={loading || isMe}
-                            >
-                              Kick
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                          {isLeader && member.role !== "leader" ? (
+                            <div className="flex gap-1.5">
+                              <button
+                                className="flex-1 rounded-md bg-[#516051] px-2 py-1 text-xs text-white disabled:opacity-50"
+                                onClick={() => onPromoteMember(member.memberId)}
+                                disabled={loading || isMe}
+                              >
+                                Promote
+                              </button>
+                              <button
+                                className="flex-1 rounded-md bg-[#c53947] px-2 py-1 text-xs text-white disabled:opacity-50"
+                                onClick={() => onKickMember(member.memberId)}
+                                disabled={loading || isMe}
+                              >
+                                Kick
+                              </button>
+                            </div>
+                          ) : null}
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
                 </div>
               </div>
               ) : null}
@@ -1346,8 +1581,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
           </div>
         )}
 
-        {message ? <p className="shrink-0 text-sm text-[#4a544a] pt-1">{message}</p> : null}
+        {message ? <p className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400 pt-2 animate-pulse">{message}</p> : null}
       </div>
-    </main>
+    </motion.main>
   );
 }

@@ -33,6 +33,8 @@ export const useSquadLobbyAgora = () => {
   const [currentChannelName, setCurrentChannelName] = useState<string | null>(null);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
+  const [speakingUsers, setSpeakingUsers] = useState<Set<number>>(new Set());
+  const [networkQuality, setNetworkQuality] = useState<Record<number, number>>({});
 
   const bindClientEvents = useCallback(() => {
     client.removeAllListeners();
@@ -59,6 +61,30 @@ export const useSquadLobbyAgora = () => {
     client.on("user-left", () => {
       setRemoteUsers(getRemoteUsers(client));
     });
+
+    client.on("volume-indicator", (volumes) => {
+      const active = new Set<number>();
+      volumes.forEach((v) => {
+        if (v.level > 10) {
+          active.add(Number(v.uid));
+        }
+      });
+      setSpeakingUsers(active);
+    });
+
+    client.on("network-quality", (stats) => {
+      setNetworkQuality(prev => ({
+        ...prev,
+        [client.uid ? Number(client.uid) : 0]: stats.downlinkNetworkQuality,
+      }));
+    });
+
+    client.on("user-network-quality", (user, stats) => {
+      setNetworkQuality(prev => ({
+        ...prev,
+        [Number(user.uid)]: stats.downlinkNetworkQuality,
+      }));
+    });
   }, [client]);
 
   const joinLobby = useCallback(
@@ -70,6 +96,8 @@ export const useSquadLobbyAgora = () => {
 
       await client.join(appId, channelName, token, uid);
       await client.publish([micTrack, camTrack]);
+
+      client.enableAudioVolumeIndicator();
 
       joinedRef.current = true;
       setLocalAudioTrack(micTrack);
@@ -129,6 +157,8 @@ export const useSquadLobbyAgora = () => {
     participantsCount,
     isMicOn,
     isVideoOn,
+    speakingUsers,
+    networkQuality,
     joinLobby,
     leaveLobby,
     toggleMic,

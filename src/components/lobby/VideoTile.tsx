@@ -11,6 +11,9 @@ type Props = {
   presence?: string;
   micOn?: boolean;
   showVideo?: boolean;
+  isBlurred?: boolean;
+  isSpeaking?: boolean;
+  networkQuality?: number;
 };
 
 export function MicStateIcon({ enabled, className = "h-3.5 w-3.5" }: { enabled: boolean; className?: string }) {
@@ -53,7 +56,7 @@ export function CameraStateIcon({ enabled, className = "h-3.5 w-3.5" }: { enable
   );
 }
 
-export function VideoTile({ label, track, role, ready, presence, micOn, showVideo = true }: Props) {
+export function VideoTile({ label, track, role, ready, presence, micOn, showVideo = true, isBlurred = false, isSpeaking = false, networkQuality = 0 }: Props) {
   const videoRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -71,9 +74,26 @@ export function VideoTile({ label, track, role, ready, presence, micOn, showVide
   }, [showVideo, track]);
 
   return (
-    <div className="relative rounded-xl border border-[#c5c9c1] bg-[#1a2119] overflow-hidden aspect-video">
-      <div ref={videoRef} className="h-full w-full" />
-      <div className="absolute right-2 top-2 flex gap-1">
+    <div className={`relative rounded-xl border-2 transition-all duration-300 overflow-hidden aspect-video group ${
+      isSpeaking ? "border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)] scale-[1.02]" : "border-transparent bg-[#1a2119]"
+    }`}>
+      <div 
+        ref={videoRef} 
+        className={`h-full w-full transition-all duration-1000 ${isBlurred ? "blur-2xl scale-110 grayscale" : "blur-0 scale-100 grayscale-0"}`} 
+      />
+      <div className="absolute right-2 top-2 flex gap-1 z-10">
+        {networkQuality > 0 && (
+          <span 
+            className={`inline-flex items-center justify-center rounded-full p-1.5 bg-black/40 text-white backdrop-blur-md`}
+            title={`Network quality: ${networkQuality}`}
+          >
+            <div className="flex gap-0.5 items-end h-3 w-3">
+               <div className={`w-0.5 rounded-full ${networkQuality <= 4 ? 'bg-emerald-400 h-full' : 'bg-rose-400 h-1/3'}`} />
+               <div className={`w-0.5 rounded-full ${networkQuality <= 3 ? 'bg-emerald-400 h-full' : 'bg-gray-400 h-1/2'}`} />
+               <div className={`w-0.5 rounded-full ${networkQuality <= 2 ? 'bg-emerald-400 h-full' : 'bg-gray-400 h-3/4'}`} />
+            </div>
+          </span>
+        )}
         <span
           className={`inline-flex items-center justify-center rounded-full p-1.5 ${
             micOn ? "bg-sky-500/70 text-white" : "bg-rose-500/70 text-white"
@@ -92,20 +112,20 @@ export function VideoTile({ label, track, role, ready, presence, micOn, showVide
         </span>
       </div>
       {!showVideo ? (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-[#d9e2d1] bg-[#1a2119]/90">
+        <div className="absolute inset-0 flex items-center justify-center text-sm text-[#d9e2d1] bg-[#1a2119]/90 z-20">
           Camera off
         </div>
       ) : null}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-[#f8fbf6]">
-        <div className="font-medium">{label}</div>
-        <div className="mt-1 flex flex-wrap gap-2 text-xs text-[#d9e2d1]">
-          {role ? <span className="rounded-full bg-white/10 px-2 py-1">{role}</span> : null}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 text-white z-10">
+        <div className="font-bold text-shadow-sm">{label}</div>
+        <div className="mt-1.5 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider font-semibold">
+          {role ? <span className="rounded-md bg-white/20 px-2 py-0.5 backdrop-blur-md">{role}</span> : null}
           {typeof ready === "boolean" ? (
-            <span className={`rounded-full px-2 py-1 ${ready ? "bg-emerald-500/30 text-emerald-100" : "bg-amber-500/30 text-amber-100"}`}>
-              {ready ? "Ready" : "Not ready"}
+            <span className={`rounded-md px-2 py-0.5 backdrop-blur-md ${ready ? "bg-emerald-500/40 text-emerald-50" : "bg-amber-500/40 text-amber-50"}`}>
+              {ready ? "Ready" : "Wait"}
             </span>
           ) : null}
-          {presence ? <span className="rounded-full bg-white/10 px-2 py-1">{presence}</span> : null}
+          {presence ? <span className="rounded-md bg-white/20 px-2 py-0.5 backdrop-blur-md">{presence}</span> : null}
         </div>
       </div>
     </div>

@@ -21,6 +21,7 @@ export type SquadState = {
   status: SquadStatus;
   members: SquadMember[];
   leaderMemberId?: string;
+  tags?: string[];
 };
 
 export type SquadContextResponse = {
@@ -32,6 +33,7 @@ export type SquadContextResponse = {
   members?: SquadMember[];
   member?: SquadMember;
   leaderMemberId?: string | null;
+  tags?: string[];
 };
 
 export type AgoraLobbyToken = {
