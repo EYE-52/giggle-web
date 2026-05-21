@@ -28,6 +28,7 @@ import { BackendApiError } from "@/lib/api/client";
 import type { EncounterHandoffResponse, MatchmakingStatusResponse, SquadState } from "@/types/giggle";
 import { useSquadLobbyAgora } from "@/lib/agora/useSquadLobbyAgora";
 import { CameraStateIcon, MicStateIcon, VideoTile } from "@/components/lobby/VideoTile";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Props = {
   backendToken: string;
@@ -45,12 +46,12 @@ type ActionIconButtonProps = {
 };
 
 const toneClassMap: Record<ActionIconButtonProps["tone"], string> = {
-  indigo: "bg-[#516051] text-white",
-  slate: "bg-[#eef2ec] text-[#1b1c1a]",
-  amber: "bg-[#d6a83d] text-white",
-  cyan: "bg-[#2aa9b6] text-white",
-  emerald: "bg-[#3f765f] text-white",
-  rose: "bg-[#c53947] text-white",
+  indigo: "bg-[#516051] dark:bg-[#697969] text-white",
+  slate: "bg-[#eef2ec] dark:bg-gray-700 text-[#1b1c1a] dark:text-gray-200",
+  amber: "bg-[#d6a83d] dark:bg-yellow-600 text-white",
+  cyan: "bg-[#2aa9b6] dark:bg-cyan-600 text-white",
+  emerald: "bg-[#3f765f] dark:bg-emerald-600 text-white",
+  rose: "bg-[#c53947] dark:bg-red-600 text-white",
 };
 
 function ActionIconButton({ label, title, onClick, disabled, tone, icon }: ActionIconButtonProps) {
@@ -964,39 +965,42 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
   };
 
   return (
-    <main className="h-screen flex flex-col landing-shell overflow-hidden">
-      <header className="shrink-0 landing-header border-b border-[rgba(255,255,255,0.1)] px-6 py-3 flex items-center justify-between">
+    <main className="h-screen flex flex-col landing-shell overflow-hidden bg-gray-900 dark:bg-gray-900">
+      <header className="shrink-0 landing-header border-b border-[rgba(255,255,255,0.1)] dark:border-gray-700 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {userImage ? (
             <img src={userImage} alt="profile" className="h-8 w-8 rounded-full" />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-[#516051] flex items-center justify-center text-white text-sm font-semibold shrink-0">
+            <div className="h-8 w-8 rounded-full bg-[#516051] dark:bg-[#697969] flex items-center justify-center text-white text-sm font-semibold shrink-0">
               {userName?.charAt(0).toUpperCase() ?? "?"}
             </div>
           )}
           <div>
-            <p className="text-xs text-[#f0f2ec]">Giggle Phase 1 Lobby Demo</p>
-            <h1 className="font-semibold text-sm">Welcome, {userName}</h1>
+            <p className="text-xs text-[#f0f2ec] dark:text-gray-300">Giggle Phase 1 Lobby Demo</p>
+            <h1 className="font-semibold text-sm text-white dark:text-gray-100">Welcome, {userName}</h1>
           </div>
         </div>
-        <button className="text-sm text-white" onClick={() => signOut()}>
-          Sign out
-        </button>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <button className="text-sm text-white dark:text-gray-200 hover:text-gray-300 dark:hover:text-gray-100" onClick={() => signOut()}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 overflow-hidden p-4">
         {!squad ? (
           <section className="grid md:grid-cols-2 gap-4 max-w-2xl mx-auto mt-8">
-            <div className="rounded-2xl landing-card border p-4 space-y-3">
-              <h2 className="font-semibold">Create Squad</h2>
+            <div className="rounded-2xl landing-card border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-3">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Create Squad</h2>
               <input
-                className="w-full rounded-lg border border-[#c5c9c1] p-2"
+                className="w-full rounded-lg border border-[#c5c9c1] dark:border-gray-600 bg-white dark:bg-gray-700 p-2 text-gray-900 dark:text-gray-100"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Display name"
               />
               <button
-                className="w-full rounded-lg bg-[#516051] text-white py-2 disabled:opacity-50"
+                className="w-full rounded-lg bg-[#516051] dark:bg-[#697969] text-white py-2 disabled:opacity-50 hover:bg-opacity-90 dark:hover:bg-opacity-80"
                 onClick={onCreateSquad}
                 disabled={loading}
               >
@@ -1004,16 +1008,16 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
               </button>
             </div>
 
-            <div className="rounded-2xl landing-card border p-4 space-y-3">
-              <h2 className="font-semibold">Join Squad</h2>
+            <div className="rounded-2xl landing-card border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-3">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Join Squad</h2>
               <input
-                className="w-full rounded-lg border border-[#c5c9c1] p-2 uppercase"
+                className="w-full rounded-lg border border-[#c5c9c1] dark:border-gray-600 bg-white dark:bg-gray-700 p-2 uppercase text-gray-900 dark:text-gray-100"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
                 placeholder="ABC-123"
               />
               <button
-                className="w-full rounded-lg bg-[#697969] text-white py-2 disabled:opacity-50"
+                className="w-full rounded-lg bg-[#697969] dark:bg-gray-600 text-white py-2 disabled:opacity-50 hover:bg-opacity-90 dark:hover:bg-opacity-80"
                 onClick={onJoinSquad}
                 disabled={loading}
               >
@@ -1024,47 +1028,47 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
         ) : (
           <div className="h-full flex gap-4 overflow-hidden">
             {/* LEFT: Squad Section */}
-            <div className="w-72 shrink-0 flex flex-col overflow-hidden rounded-2xl border landing-card shadow-sm">
+            <div className="w-72 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
               <div className="shrink-0 landing-header px-4 py-3 flex items-center justify-between">
                 <h2 className="font-semibold text-white text-sm">Squad</h2>
-                <span className="text-xs bg-[#7f9b8f] text-[#f7faf6] rounded-full px-2 py-0.5">{squad.status}</span>
+                <span className="text-xs bg-[#7f9b8f] dark:bg-gray-600 text-[#f7faf6] dark:text-gray-200 rounded-full px-2 py-0.5">{squad.status}</span>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
 
-              <div className="text-xs">
-                Squad: <span className="font-semibold">{squad.squadName}</span>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                Squad: <span className="font-semibold text-gray-900 dark:text-gray-100">{squad.squadName}</span>
               </div>
 
-              <div className="text-xs">
-                Invite code: <span className="font-semibold">{squad.squadCode}</span>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                Invite code: <span className="font-semibold text-gray-900 dark:text-gray-100">{squad.squadCode}</span>
               </div>
 
-              <div className="text-xs text-[#3e443d] rounded-lg border border-[var(--border)] bg-[#efeeeb] p-2">
-                Match state: <span className="font-medium">{matchStatus?.state || squad.status}</span>
+              <div className="text-xs text-[#3e443d] dark:text-gray-400 rounded-lg border border-[var(--border)] dark:border-gray-600 bg-[#efeeeb] dark:bg-gray-700 p-2">
+                Match state: <span className="font-medium text-gray-900 dark:text-gray-100">{matchStatus?.state || squad.status}</span>
                 {matchStatus?.queue ? ` | Queue wait: ${matchStatus.queue.waitSeconds}s` : ""}
                 {encounterId ? ` | Encounter: ${encounterId}` : ""}
               </div>
 
               {encounterId && matchStatus?.match ? (
-                <div className="text-xs text-[#3b5f57] rounded-lg border border-[#cde2da] bg-[#eef5f1] p-2">
-                  Encounter room: <span className="font-semibold">{matchStatus.match.ownSquadName}</span>
+                <div className="text-xs text-[#3b5f57] dark:text-green-400 rounded-lg border border-[#cde2da] dark:border-green-600 bg-[#eef5f1] dark:bg-green-900 p-2">
+                  Encounter room: <span className="font-semibold text-gray-900 dark:text-gray-100">{matchStatus.match.ownSquadName}</span>
                   {" vs "}
-                  <span className="font-semibold">{matchStatus.match.opponentSquadName}</span>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100">{matchStatus.match.opponentSquadName}</span>
                 </div>
               ) : null}
 
               {isLeader ? (
-                <div className="rounded-xl landing-panel border border-[var(--border)] p-3 space-y-2">
-                  <div className="text-xs uppercase tracking-wide text-[#4a5d4f]">Squad Name</div>
+                <div className="rounded-xl landing-panel border border-[var(--border)] dark:border-gray-600 bg-white dark:bg-gray-700 p-3 space-y-2">
+                  <div className="text-xs uppercase tracking-wide text-[#4a5d4f] dark:text-gray-300">Squad Name</div>
                   <input
-                    className="w-full rounded-lg border border-[#c5c9c1] p-2 text-sm"
+                    className="w-full rounded-lg border border-[#c5c9c1] dark:border-gray-600 bg-white dark:bg-gray-600 p-2 text-sm text-gray-900 dark:text-gray-100"
                     value={newSquadName}
                     onChange={(e) => setNewSquadName(e.target.value)}
                     placeholder={squad.squadName}
                     maxLength={32}
                   />
                   <button
-                    className="w-full rounded-lg bg-[#516051] px-3 py-2 text-sm text-white disabled:opacity-50"
+                    className="w-full rounded-lg bg-[#516051] dark:bg-[#697969] px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-opacity-90 dark:hover:bg-opacity-80"
                     onClick={onUpdateSquadName}
                     disabled={loading || newSquadName.trim().length < 2}
                   >
@@ -1073,8 +1077,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                 </div>
               ) : null}
 
-              <div className="rounded-xl landing-panel border border-[var(--border)] p-3 space-y-3">
-                <div className="text-xs uppercase tracking-wide text-[#4a5d4f]">Quick Controls</div>
+              <div className="rounded-xl landing-panel border border-[var(--border)] dark:border-gray-600 bg-white dark:bg-gray-700 p-3 space-y-3">
+                <div className="text-xs uppercase tracking-wide text-[#4a5d4f] dark:text-gray-300">Quick Controls</div>
                 <div className="flex flex-wrap gap-2">
                   <ActionIconButton
                     label={myMember?.ready ? "Not ready" : "Ready"}
@@ -1172,10 +1176,10 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
             <div className="flex-1 flex gap-4 overflow-hidden">
 
               {/* Video Lobby / Encounter Room */}
-              <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border landing-card shadow-sm">
+              <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
                 <div className={`shrink-0 px-4 py-2.5 flex items-center justify-between ${isInEncounterChannel ? "landing-danger" : "landing-header"}`}>
                   <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "⚔ Encounter Room" : "Video Lobby"}</h3>
-                  <span className="text-xs text-[#f0f2ec]">{participantsCount} active</span>
+                  <span className="text-xs text-[#f0f2ec] dark:text-gray-300">{participantsCount} active</span>
                 </div>
                 <div className="flex-1 overflow-hidden">
                   {isInEncounterChannel ? (
@@ -1184,8 +1188,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                       {/* Own squad side */}
                       <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
                         <div className="shrink-0 flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wide text-[#35513f] bg-[#eef2ec] rounded-full px-2 py-0.5">{ownEncounterSquadName}</span>
-                          <span className="text-xs text-[#6a6c63]">{encounterSplitTiles.ownSquadTiles.length} member{encounterSplitTiles.ownSquadTiles.length !== 1 ? "s" : ""}</span>
+                          <span className="text-xs font-bold uppercase tracking-wide text-[#35513f] dark:text-green-400 bg-[#eef2ec] dark:bg-green-900 rounded-full px-2 py-0.5">{ownEncounterSquadName}</span>
+                          <span className="text-xs text-[#6a6c63] dark:text-gray-400">{encounterSplitTiles.ownSquadTiles.length} member{encounterSplitTiles.ownSquadTiles.length !== 1 ? "s" : ""}</span>
                         </div>
                         <div
                           className="flex-1 grid gap-2 content-start"
@@ -1218,8 +1222,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                       {/* Opponent squad side */}
                       <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
                         <div className="shrink-0 flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wide text-[#944147] bg-[#f9dedf] rounded-full px-2 py-0.5">{opponentEncounterSquadName}</span>
-                          <span className="text-xs text-[#6a6c63]">{encounterSplitTiles.opponentSquadTiles.length} member{encounterSplitTiles.opponentSquadTiles.length !== 1 ? "s" : ""}</span>
+                          <span className="text-xs font-bold uppercase tracking-wide text-[#944147] dark:text-red-400 bg-[#f9dedf] dark:bg-red-900 rounded-full px-2 py-0.5">{opponentEncounterSquadName}</span>
+                          <span className="text-xs text-[#6a6c63] dark:text-gray-400">{encounterSplitTiles.opponentSquadTiles.length} member{encounterSplitTiles.opponentSquadTiles.length !== 1 ? "s" : ""}</span>
                         </div>
                         {encounterSplitTiles.opponentSquadTiles.length > 0 ? (
                           <div
@@ -1246,8 +1250,8 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                             ))}
                           </div>
                         ) : (
-                          <div className="flex-1 flex items-center justify-center rounded-xl border border-[#f4c4c6] bg-[#fdeaef]">
-                            <p className="text-sm text-[#b5414d] text-center px-4">Waiting for opponent to join encounter video...</p>
+                          <div className="flex-1 flex items-center justify-center rounded-xl border border-[#f4c4c6] dark:border-red-600 bg-[#fdeaef] dark:bg-red-900">
+                            <p className="text-sm text-[#b5414d] dark:text-red-300 text-center px-4">Waiting for opponent to join encounter video...</p>
                           </div>
                         )}
                       </div>
@@ -1256,7 +1260,7 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                     // ── VIDEO LOBBY ──────────────────────────────────────────────
                     <div className="h-full overflow-y-auto p-4">
                       {videoTiles.filter((t) => t.presence === "In video lobby").length === 0 ? (
-                        <div className="flex items-center justify-center rounded-xl border border-dashed border-[#c5c9c1] bg-[#efeeeb] h-40 text-sm text-[#6a6c63]">
+                        <div className="flex items-center justify-center rounded-xl border border-dashed border-[#c5c9c1] dark:border-gray-600 bg-[#efeeeb] dark:bg-gray-700 h-40 text-sm text-[#6a6c63] dark:text-gray-400">
                           No one is in the video lobby yet
                         </div>
                       ) : (
@@ -1284,10 +1288,10 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
 
               {/* Squad Members sidebar — hidden during encounter to maximise video space */}
               {!isInEncounterChannel ? (
-              <div className="w-64 shrink-0 flex flex-col overflow-hidden rounded-2xl border landing-card shadow-sm">
-                <div className="shrink-0 bg-[#eef2ec] border-b border-[#d8d8d0] px-4 py-2.5 flex items-center justify-between">
-                  <h3 className="font-semibold text-sm text-[#35513f]">Squad Members</h3>
-                  <span className="text-xs text-[#4a6b5f] font-medium">{squad.members?.length ?? 0}</span>
+              <div className="w-64 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
+                <div className="shrink-0 bg-[#eef2ec] dark:bg-gray-700 border-b border-[#d8d8d0] dark:border-gray-600 px-4 py-2.5 flex items-center justify-between">
+                  <h3 className="font-semibold text-sm text-[#35513f] dark:text-gray-200">Squad Members</h3>
+                  <span className="text-xs text-[#4a6b5f] dark:text-gray-300 font-medium">{squad.members?.length ?? 0}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
                   {(squad.members ?? []).map((member) => {

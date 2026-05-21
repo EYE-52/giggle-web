@@ -2,6 +2,7 @@ import { auth, signIn } from "@/auth";
 import { LobbyClient } from "@/components/lobby/LobbyClient";
 import RotatingHeadline from "@/components/RotatingHeadline";
 import AnimatedText from "@/components/AnimatedText";
+import { Navigation } from "@/components/Navigation";
 
 export default async function Home() {
   const session = await auth();
@@ -9,29 +10,9 @@ export default async function Home() {
   return (
     <>
       {!session ? (
-        <main className="min-h-screen bg-white overflow-hidden">
+        <main className="min-h-screen bg-white dark:bg-gray-900 overflow-hidden">
           {/* Navigation */}
-          <nav className="flex items-center justify-between max-w-[1280px] mx-auto px-[32px] py-[24px] animate-fade-in">
-            <h1 className="text-[24px] font-extrabold text-[#1b1c1a]">Giggle</h1>
-            <div className="flex items-center gap-[32px]">
-              <a
-                href="#about"
-                className="text-[#434842] font-medium hover:text-[#1b1c1a] transition-colors"
-              >
-                About
-              </a>
-              <form
-                action={async () => {
-                  "use server";
-                  await signIn("google");
-                }}
-              >
-                <button className="px-[32px] py-[12px] bg-[#516051] text-white rounded-[8px] font-semibold hover:bg-opacity-90 transition-all shadow-sm hover:shadow-md">
-                  Sign in
-                </button>
-              </form>
-            </div>
-          </nav>
+          <Navigation />
 
           {/* Hero Section */}
           <section className="max-w-[1280px] mx-auto px-[32px] py-[96px] relative">
@@ -42,7 +23,7 @@ export default async function Home() {
                   <RotatingHeadline />
                 </div>
                 <p
-                  className="text-[20px] text-[#434842] leading-[32px] max-w-[576px] animate-fade-in-up-loop"
+                  className="text-[20px] text-[#434842] dark:text-gray-300 leading-[32px] max-w-[576px] animate-fade-in-up-loop"
                   style={{ animationDelay: "0.2s" }}
                 >
                   Bring your friends into a shared video space and get matched with another squad in real-time. Experience meaningful connections with groups, not strangers alone. A premium, moderated way to discover new friends together.
@@ -68,18 +49,18 @@ export default async function Home() {
               <div className="flex flex-col justify-center relative">
                 {/* Main Card */}
                 <div
-                  className="transform rotate-1 shadow-lg rounded-[12px] overflow-hidden bg-white border border-[rgba(0,0,0,0.08)] animate-fade-in-up-loop"
+                  className="transform rotate-1 shadow-lg rounded-[12px] overflow-hidden bg-white dark:bg-gray-800 border border-[rgba(0,0,0,0.08)] dark:border-gray-700 animate-fade-in-up-loop"
                   style={{ animationDelay: "0.4s" }}
                 >
                   {/* Browser Header */}
-                  <div className="bg-[#f1f1f1] flex gap-[6px] items-center px-[16px] py-[10px]">
+                  <div className="bg-[#f1f1f1] dark:bg-gray-700 flex gap-[6px] items-center px-[16px] py-[10px]">
                     <div className="w-[8px] h-[8px] rounded bg-[#ff5f56] animate-bounce-in-loop" style={{ animationDelay: "0.5s" }} />
                     <div className="w-[8px] h-[8px] rounded bg-[#ffbd2e] animate-bounce-in-loop" style={{ animationDelay: "0.6s" }} />
                     <div className="w-[8px] h-[8px] rounded bg-[#27c93f] animate-bounce-in-loop" style={{ animationDelay: "0.7s" }} />
-                    <div className="flex-1 ml-[12px] bg-white rounded border border-[rgba(0,0,0,0.05)] h-[18px]" />
+                    <div className="flex-1 ml-[12px] bg-white dark:bg-gray-200 rounded border border-[rgba(0,0,0,0.05)] dark:border-gray-600 h-[18px]" />
                   </div>
                   {/* Content */}
-                  <div className="bg-[#efeeeb] aspect-video flex items-center justify-center overflow-hidden">
+                  <div className="bg-[#efeeeb] dark:bg-gray-600 aspect-video flex items-center justify-center overflow-hidden">
                     <img
                       src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=400&fit=crop"
                       alt="Squad meeting"
@@ -90,7 +71,7 @@ export default async function Home() {
 
                 {/* Testimonial Card - Right Side */}
                 <div
-                  className="absolute -right-12 bottom-2 transform -rotate-2 bg-white rounded-[12px] p-[25px] border border-[rgba(196,200,192,0.2)] shadow-lg max-w-[320px] animate-fade-in-up-loop"
+                  className="absolute -right-12 bottom-2 transform -rotate-2 bg-white dark:bg-gray-800 rounded-[12px] p-[25px] border border-[rgba(196,200,192,0.2)] dark:border-gray-600 shadow-lg max-w-[320px] animate-fade-in-up-loop"
                   style={{ animationDelay: "0.5s" }}
                 >
                   <div className="flex items-center gap-[8px] mb-[12px]">
