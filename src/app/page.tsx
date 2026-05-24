@@ -10,13 +10,14 @@ import {
   Users, 
   Target, 
   ShieldCheck, 
-  MessageSquare, 
   Zap, 
-  Lock 
+  Lock,
+  Crown,
+  History,
+  Video
 } from "lucide-react";
 
-export default function Home() {
-  const { data: session, status } = useSession();
+function LandingPage() {
   const containerRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -24,24 +25,6 @@ export default function Home() {
   });
 
   const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
-
-  if (status === "loading") {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#f7faf6] dark:bg-gray-950">
-        <div className="w-12 h-12 border-4 border-[#516051] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (session) {
-    return (
-      <LobbyClient
-        backendToken={session.backendToken || ""}
-        userName={session.user?.name || "User"}
-        userImage={session.user?.image}
-      />
-    );
-  }
 
   return (
     <div ref={containerRef} className="bg-[#f7faf6] dark:bg-gray-950 text-gray-900 dark:text-gray-100 selection:bg-[#516051] selection:text-white">
@@ -215,6 +198,95 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Giggle Premium: Monetization Section */}
+      <section className="py-32 px-6 bg-white dark:bg-gray-900/30 overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col items-center text-center mb-20">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              whileInView={{ scale: 1, opacity: 1 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-black uppercase tracking-[0.2em] mb-6"
+            >
+              <Crown size={14} className="fill-current" />
+              <span>Giggle Premium</span>
+            </motion.div>
+            <h3 className="text-4xl md:text-6xl font-black mb-6 text-gray-900 dark:text-white">Elevate Your Squad</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-lg max-w-2xl mx-auto">
+              Unlock the full potential of social discovery. Designed for power squads who want better connections, faster.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-4 gap-6">
+            {[
+              {
+                title: "Fast Pass",
+                desc: "Jump to the front of the matchmaking queue. Our algorithm prioritizes your squad instantly.",
+                icon: Zap
+              },
+              {
+                title: "Encounter History",
+                desc: "Never lose a great connection. Browse squads you've met and send 'Vibe Checks' to reconnect.",
+                icon: History
+              },
+              {
+                title: "VIP Vibe Tags",
+                desc: "Access exclusive tags like #Dating, #Local, and #VIP to find highly curated squads.",
+                icon: Target
+              },
+              {
+                title: "Crystal Clear HD",
+                desc: "Unlock 1080p high-bitrate video for the most immersive squad encounters possible.",
+                icon: Video
+              }
+            ].map((item, idx) => (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1 }}
+                key={idx}
+                className="group relative p-8 rounded-[32px] bg-[#fcfdfa] dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-amber-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-amber-500/5"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <item.icon size={24} />
+                </div>
+                <h4 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">{item.title}</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                  {item.desc}
+                </p>
+                <div className="absolute top-4 right-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Crown size={16} className="text-amber-500/30" />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mt-16 p-8 rounded-[40px] bg-amber-500/5 border border-amber-500/10 flex flex-col md:flex-row items-center justify-between gap-8"
+          >
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 rounded-full bg-amber-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+                <Crown size={32} />
+              </div>
+              <div className="text-left">
+                <h4 className="text-2xl font-black italic text-gray-900 dark:text-white">The Leader Advantage</h4>
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">One Premium member makes the entire squad Premium for the session.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => signIn("google")}
+              className="whitespace-nowrap px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl transition-all shadow-xl shadow-amber-500/20 hover:scale-105 active:scale-95"
+            >
+              Unlock Premium
+            </button>
+          </motion.div>
+        </div>
+      </section>
+
       {/* Tech Promise: Scaling Section */}
       <section className="py-32 px-6">
         <div className="max-w-7xl mx-auto rounded-[48px] bg-gradient-to-br from-[#516051] to-[#1a2119] p-12 md:p-24 text-white relative overflow-hidden">
@@ -269,11 +341,36 @@ export default function Home() {
           </button>
 
           <div className="mt-20 flex flex-col items-center gap-4 border-t border-gray-100 dark:border-gray-900 pt-10">
-            <div className="text-[#516051] font-black text-2xl tracking-tighter">giggle.</div>
+            <div className="text-[#516051] dark:text-white font-black text-2xl tracking-tighter">giggle.</div>
             <p className="text-gray-400 text-xs tracking-[0.2em] uppercase font-bold">© 2026 Giggle Tech • All rights reserved</p>
           </div>
         </motion.div>
       </section>
     </div>
   );
+}
+
+export default function Home() {
+  const { data: session, status } = useSession();
+
+  if (status === "loading") {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#f7faf6] dark:bg-gray-950">
+        <div className="w-12 h-12 border-4 border-[#516051] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (session) {
+    return (
+      <LobbyClient
+        backendToken={session.backendToken || ""}
+        userName={session.user?.name || "User"}
+        userImage={session.user?.image}
+        isPremium={session.user?.isPremium || false}
+      />
+    );
+  }
+
+  return <LandingPage />;
 }

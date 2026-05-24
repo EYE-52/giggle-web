@@ -32,11 +32,13 @@ import { CameraStateIcon, MicStateIcon, VideoTile } from "@/components/lobby/Vid
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import { motion, AnimatePresence } from "framer-motion";
+import { Users, Zap, Info } from "lucide-react";
 
 type Props = {
   backendToken: string;
   userName: string;
   userImage?: string | null;
+  isPremium?: boolean;
 };
 
 type ActionIconButtonProps = {
@@ -255,7 +257,7 @@ const getVibeColors = (tags: string[] = []) => {
   return colors.slice(0, 2);
 };
 
-export function LobbyClient({ backendToken, userName, userImage }: Props) {
+export function LobbyClient({ backendToken, userName, userImage, isPremium = false }: Props) {
   const [displayName, setDisplayName] = useState(userName || "");
   const [newSquadName, setNewSquadName] = useState("");
   const [tagInput, setTagInput] = useState("");
@@ -767,6 +769,14 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     prevChannelRef.current = currentChannelName;
   }, [currentChannelName]);
 
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        setMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
 
   const onCreateSquad = async () => {
     setLoading(true);
@@ -858,9 +868,17 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
     e.preventDefault();
     if (!squad || !isLeader || !tagInput.trim()) return;
 
+    const parsedTag = tagInput.trim().substring(0, 15).toLowerCase();
+    const premiumTags = ["vip", "dating", "local", "premium"];
+    
+    if (premiumTags.includes(parsedTag) && !isPremium) {
+      setMessage(`The tag #${parsedTag} is reserved for Giggle Premium squads.`);
+      return;
+    }
+
     setLoading(true);
     try {
-      const newTags = [...(squad.tags || []), tagInput.trim().substring(0, 15)].slice(-5);
+      const newTags = [...(squad.tags || []), parsedTag].slice(-5);
       await updateSquadTags(backendToken, squad.squadId, newTags);
       await refreshSquad(squad.squadId);
       setTagInput("");
@@ -1097,11 +1115,24 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
             )}
             <div>
               <p className="text-[10px] text-[#f0f2ec] dark:text-gray-300 font-bold uppercase tracking-widest opacity-60">High-Scale Session</p>
-              <h1 className="font-semibold text-sm text-white dark:text-gray-100">Welcome, {userName}</h1>
+              <h1 className="font-semibold text-sm text-white dark:text-gray-100 flex items-center gap-2">
+                Welcome, {userName}
+                {isPremium && <span className="bg-gradient-to-r from-amber-200 to-amber-500 text-amber-900 text-[10px] px-1.5 py-0.5 rounded uppercase tracking-widest">Premium</span>}
+              </h1>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {!isPremium && (
+            <button 
+              className="text-xs font-bold text-amber-900 bg-gradient-to-r from-amber-200 to-amber-500 px-3 py-1.5 rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+              onClick={() => {
+                alert("Giggle Premium Stripe Integration coming soon! Features: Priority Matchmaking, Premium Tags, and Encounter History.");
+              }}
+            >
+              👑 UPGRADE
+            </button>
+          )}
           <ThemeToggle />
           <button className="text-sm text-white dark:text-gray-200 hover:text-gray-300 dark:hover:text-gray-100" onClick={() => signOut()}>
             Sign out
@@ -1111,41 +1142,93 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
 
       <div className="flex-1 overflow-hidden p-4">
         {!squad ? (
-          <section className="grid md:grid-cols-2 gap-4 max-w-2xl mx-auto mt-8">
-            <div className="rounded-2xl landing-card border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-3">
-              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Create Squad</h2>
-              <input
-                className="w-full rounded-lg border border-[#c5c9c1] dark:border-gray-600 bg-white dark:bg-gray-700 p-2 text-gray-900 dark:text-gray-100"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Display name"
-              />
-              <button
-                className="w-full rounded-lg bg-[#516051] dark:bg-[#697969] text-white py-2 disabled:opacity-50 hover:bg-opacity-90 dark:hover:bg-opacity-80"
-                onClick={onCreateSquad}
-                disabled={loading}
-              >
-                Create Squad
-              </button>
-            </div>
+          <div className="h-full w-full flex items-center justify-center">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-4xl grid md:grid-cols-2 gap-8 relative z-10"
+            >
+            {/* PATH 1: CREATE */}
+            <motion.div
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="group relative p-8 rounded-[40px] bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 hover:border-[#516051] dark:hover:border-[#7f9b8f] transition-all duration-500 shadow-xl"
+            >
+              <div className="w-16 h-16 rounded-3xl bg-[#516051]/10 text-[#516051] dark:text-[#7f9b8f] flex items-center justify-center mb-8 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500">
+                <Users size={32} />
+              </div>
+              <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-3">Initiate a Squad</h2>
+              <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-8">
+                Start a new lobby and generate a code. Invite your best friends to prepare for your first collision.
+              </p>
+              
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-gray-400 ml-1">Lobby Display Name</label>
+                  <input
+                    className="w-full rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 text-sm font-bold text-gray-900 dark:text-white focus:border-[#516051] outline-none transition-colors"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Enter name..."
+                  />
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full py-4 bg-[#516051] dark:bg-[#697969] text-white rounded-2xl font-black shadow-lg shadow-[#516051]/20 hover:bg-[#405040] disabled:opacity-50 transition-all"
+                  onClick={onCreateSquad}
+                  disabled={loading || !displayName.trim()}
+                >
+                  Create Squad Lobby
+                </motion.button>
+              </div>
+            </motion.div>
 
-            <div className="rounded-2xl landing-card border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-3">
-              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Join Squad</h2>
-              <input
-                className="w-full rounded-lg border border-[#c5c9c1] dark:border-gray-600 bg-white dark:bg-gray-700 p-2 uppercase text-gray-900 dark:text-gray-100"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="ABC-123"
-              />
-              <button
-                className="w-full rounded-lg bg-[#697969] dark:bg-gray-600 text-white py-2 disabled:opacity-50 hover:bg-opacity-90 dark:hover:bg-opacity-80"
-                onClick={onJoinSquad}
-                disabled={loading}
-              >
-                Join with Code
-              </button>
+            {/* PATH 2: JOIN */}
+            <motion.div
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="group relative p-8 rounded-[40px] bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 hover:border-sky-500/50 transition-all duration-500 shadow-xl"
+            >
+              <div className="w-16 h-16 rounded-3xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-8 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500">
+                <Zap size={32} />
+              </div>
+              <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-3">Join a Squad</h2>
+              <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-8">
+                Received a code from a friend? Enter it below to instantly teleport into their squad lobby.
+              </p>
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-gray-400 ml-1">6-Digit Squad Code</label>
+                  <input
+                    className="w-full rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 text-sm font-black text-gray-900 dark:text-white focus:border-sky-500 outline-none uppercase transition-colors tracking-[0.2em]"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    placeholder="ABC-123"
+                    maxLength={7}
+                  />
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full py-4 bg-gray-900 dark:bg-gray-700 text-white rounded-2xl font-black shadow-lg hover:bg-black transition-all disabled:opacity-50"
+                  onClick={onJoinSquad}
+                  disabled={loading || inviteCode.length < 7}
+                >
+                  Join via Code
+                </motion.button>
+              </div>
+            </motion.div>
+
+            {/* Background Flair */}
+            <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden rounded-3xl">
+               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-[#516051]/5 dark:bg-white/5 blur-[100px] rounded-full" />
             </div>
-          </section>
+          </motion.div>
+        </div>
         ) : (
           <div className="h-full flex gap-4 overflow-hidden">
             {/* LEFT: Squad Section */}
@@ -1215,7 +1298,10 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] text-gray-500 uppercase">Vibe Tags (Interests)</label>
+                    <label className="text-[10px] text-gray-500 uppercase flex items-center justify-between">
+                      <span>Vibe Tags</span>
+                      {!isPremium && <span className="text-amber-500 font-bold">👑 Get Premium for VIP tags</span>}
+                    </label>
                     <form onSubmit={onUpdateTags} className="flex gap-1">
                       <input
                         className="flex-1 rounded-lg border border-[#c5c9c1] dark:border-gray-600 bg-white dark:bg-gray-600 p-1.5 text-xs text-gray-900 dark:text-gray-100"
@@ -1581,7 +1667,25 @@ export function LobbyClient({ backendToken, userName, userImage }: Props) {
           </div>
         )}
 
-        {message ? <p className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400 pt-2 animate-pulse">{message}</p> : null}
+        <AnimatePresence>
+          {message && (
+            <motion.div
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[100]"
+            >
+              <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-gray-900/90 dark:bg-white/90 backdrop-blur-xl border border-white/10 dark:border-black/10 shadow-2xl shadow-black/50">
+                <div className="w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center text-white">
+                  <Info size={12} />
+                </div>
+                <p className="text-sm font-bold text-white dark:text-gray-900 whitespace-nowrap">
+                  {message}
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.main>
   );

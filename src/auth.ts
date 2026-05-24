@@ -31,12 +31,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const data = await res.json();
           token.backendToken = data.token;
           token.userId = data.user?.id;
+          token.isPremium = data.user?.isPremium;
         } catch (err) {
           console.error("Auth exchange failed:", err);
         }
       }
-    console.log("JWT TOKEN:", token);
-
       return token;
     },
 
@@ -45,8 +44,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.backendToken = token.backendToken;
 
         session.user.id = token.userId || token.sub;
+        session.user.isPremium = token.isPremium || false;
       }
-      console.log("FINAL SESSION:", session);
       return session;
     },
   },

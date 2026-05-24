@@ -6,6 +6,7 @@ declare module "next-auth" {
     backendToken?: string;
     user: {
       id?: string;
+      isPremium?: boolean;
     } & Session["user"];
   }
 }
@@ -14,5 +15,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     backendToken?: string;
     userId?: string;
+    isPremium?: boolean;
   }
 }
