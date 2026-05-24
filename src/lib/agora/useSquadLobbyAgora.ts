@@ -6,6 +6,7 @@ import AgoraRTC, {
   ICameraVideoTrack,
   IMicrophoneAudioTrack,
   IAgoraRTCRemoteUser,
+  NetworkQuality,
 } from "agora-rtc-sdk-ng";
 
 type JoinArgs = {
@@ -72,14 +73,14 @@ export const useSquadLobbyAgora = () => {
       setSpeakingUsers(active);
     });
 
-    client.on("network-quality", (stats) => {
+    client.on("network-quality", (stats: NetworkQuality) => {
       setNetworkQuality(prev => ({
         ...prev,
         [client.uid ? Number(client.uid) : 0]: stats.downlinkNetworkQuality,
       }));
     });
 
-    client.on("user-network-quality", (user, stats) => {
+    client.on("user-network-quality", (user: IAgoraRTCRemoteUser, stats: NetworkQuality) => {
       setNetworkQuality(prev => ({
         ...prev,
         [Number(user.uid)]: stats.downlinkNetworkQuality,
