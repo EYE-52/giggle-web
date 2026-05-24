@@ -32,7 +32,7 @@ import { CameraStateIcon, MicStateIcon, VideoTile } from "@/components/lobby/Vid
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Zap, Info } from "lucide-react";
+import { Users, Zap, Info, MessageSquare } from "lucide-react";
 
 type Props = {
   backendToken: string;
@@ -270,6 +270,9 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
   const [handoffStatus, setHandoffStatus] = useState<EncounterHandoffResponse | null>(null);
   const [isRevealing, setIsRevealing] = useState(false);
   const [revealCountdown, setRevealCountdown] = useState(0);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const {
     joined,
@@ -558,7 +561,12 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
       setMessage("Encounter ended.");
       setMatchStatus(null);
       setHandoffStatus(null);
+      setChatMessages([]);
       void refreshSquad(squad.squadId);
+    });
+
+    socket.on("new_message", (msg) => {
+      setChatMessages((prev) => [...prev, msg].slice(-50));
     });
 
     socket.on("SQUAD_UPDATED", () => {
@@ -684,6 +692,9 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
           token: tokenData.rtcToken,
           uid: tokenData.uid,
         });
+        
+        getSocket().emit("join_encounter", encounterId);
+
         await Promise.all([
           setLobbyVideoPresence(backendToken, squad.squadId, false).catch(() => {}),
           setEncounterVideoPresence(backendToken, squad.squadId, true).catch(() => {}),
@@ -777,6 +788,24 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
       return () => clearTimeout(timer);
     }
   }, [message]);
+
+  const onSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !encounterId || !myMember) return;
+
+    getSocket().emit("send_message", {
+      encounterId,
+      text: chatInput.trim(),
+      senderName: myMember.displayName,
+      senderId: myMember.userId,
+      squadId: squad?.squadId,
+    });
+    setChatInput("");
+  };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
   const onCreateSquad = async () => {
     setLoading(true);
@@ -1030,27 +1059,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
     setLoading(true);
 
     try {
-      const result = await disconnectEncounter(backendToken, squad.squadId, encounterId);
-      
-      // Return to lobby
-      await leaveLobby();
-      autoJoinedEncounterRef.current = null;
-      await setEncounterVideoPresence(backendToken, squad.squadId, false).catch(() => {});
-
-      // Rejoin lobby
-      const tokenData = await getLobbyToken(backendToken, squad.squadId);
-      await joinLobby({
-        appId: tokenData.appId,
-        channelName: tokenData.channelName,
-        token: tokenData.rtcToken,
-        uid: tokenData.uid,
-      });
-      await setLobbyVideoPresence(backendToken, squad.squadId, true).catch(() => {});
-      await refreshSquad(squad.squadId);
-      const status = await getMatchmakingStatus(backendToken, squad.squadId);
-      setMatchStatus(status);
-      setHandoffStatus(null);
-      setMessage("Encounter disconnected. Your squad returned to the lobby.");
+      await disconnectEncounter(backendToken, squad.squadId, encounterId);
+      setMessage("Encounter disconnected. Returning to lobby...");
     } catch (error) {
       const err = error as BackendApiError;
       setMessage(err.message || "Failed to disconnect encounter");
@@ -1065,24 +1075,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
 
     try {
       await skipEncounter(backendToken, squad.squadId, encounterId);
-      await leaveLobby();
-      autoJoinedEncounterRef.current = null;
-      await setEncounterVideoPresence(backendToken, squad.squadId, false).catch(() => {});
-
-      const tokenData = await getLobbyToken(backendToken, squad.squadId);
-      await joinLobby({
-        appId: tokenData.appId,
-        channelName: tokenData.channelName,
-        token: tokenData.rtcToken,
-        uid: tokenData.uid,
-      });
-      await setLobbyVideoPresence(backendToken, squad.squadId, true).catch(() => {});
-
-      await refreshSquad(squad.squadId);
-      const status = await getMatchmakingStatus(backendToken, squad.squadId);
-      setMatchStatus(status);
-      setHandoffStatus(null);
-      setMessage("Encounter skipped. Requeued for matchmaking.");
+      setMessage("Skipping encounter... Finding next squad.");
     } catch (error) {
       const err = error as BackendApiError;
       setMessage(err.message);
@@ -1325,21 +1318,25 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
               <div className="rounded-xl landing-panel border border-[var(--border)] dark:border-gray-600 bg-white dark:bg-gray-700 p-3 space-y-3">
                 <div className="text-xs uppercase tracking-wide text-[#4a5d4f] dark:text-gray-300">Quick Controls</div>
                 <div className="flex flex-wrap gap-2">
-                  <ActionIconButton
-                    label={myMember?.ready ? "Not ready" : "Ready"}
-                    onClick={onToggleReady}
-                    disabled={loading || !myMember}
-                    tone="indigo"
-                    icon={<ReadyIcon ready={Boolean(myMember?.ready)} />}
-                  />
+                  {!encounterId && (
+                    <>
+                      <ActionIconButton
+                        label={myMember?.ready ? "Not ready" : "Ready"}
+                        onClick={onToggleReady}
+                        disabled={loading || !myMember}
+                        tone="indigo"
+                        icon={<ReadyIcon ready={Boolean(myMember?.ready)} />}
+                      />
 
-                  <ActionIconButton
-                    label={joined ? "Leave video" : "Join video"}
-                    onClick={joined ? onLeaveVideoLobby : onJoinLobbyVideo}
-                    disabled={joiningAgora}
-                    tone={joined ? "slate" : "indigo"}
-                    icon={joined ? <LeaveVideoIcon /> : <JoinVideoIcon />}
-                  />
+                      <ActionIconButton
+                        label={joined ? "Leave video" : "Join video"}
+                        onClick={joined ? onLeaveVideoLobby : onJoinLobbyVideo}
+                        disabled={joiningAgora}
+                        tone={joined ? "slate" : "indigo"}
+                        icon={joined ? <LeaveVideoIcon /> : <JoinVideoIcon />}
+                      />
+                    </>
+                  )}
 
                   <ActionIconButton
                     label={isMicOn ? "Mute" : "Unmute"}
@@ -1509,7 +1506,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                       </div>
 
                       {/* Divider */}
-                      <div className="shrink-0 w-px bg-[#d8d8d0] self-stretch" />
+                      <div className="shrink-0 w-px bg-white/10 self-stretch" />
 
                       {/* Opponent squad side */}
                       <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
@@ -1564,6 +1561,60 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                             <p className="text-sm text-[#b5414d] dark:text-red-300 text-center px-4">Waiting for opponent to join encounter video...</p>
                           </div>
                         )}
+                      </div>
+
+                      {/* COLLISION CHAT PANE */}
+                      <div className="w-80 shrink-0 flex flex-col bg-black/20 backdrop-blur-md border-l border-white/10">
+                        <div className="p-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Collision Chat</span>
+                          <MessageSquare size={14} className="text-white/40" />
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                          {chatMessages.length === 0 && (
+                            <div className="h-full flex items-center justify-center text-center opacity-40">
+                              <p className="text-[10px] text-white uppercase tracking-tighter">No messages yet.<br/>Say hi to the other squad!</p>
+                            </div>
+                          )}
+                          {chatMessages.map((msg) => {
+                            const isMe = msg.senderId === myMember?.userId;
+                            const isOwnSquad = msg.squadId === squad?.squadId;
+                            return (
+                              <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                                <span className="text-[9px] font-bold text-white/40 mb-1 px-1">
+                                  {isMe ? "You" : msg.senderName} 
+                                  {!isOwnSquad && <span className="text-rose-400 ml-1">• Opponent</span>}
+                                </span>
+                                <div className={`max-w-[90%] px-3 py-2 rounded-2xl text-sm ${
+                                  isOwnSquad 
+                                    ? "bg-[#516051] text-white rounded-tr-none" 
+                                    : "bg-white/10 text-white rounded-tl-none border border-white/5"
+                                }`}>
+                                  {msg.text}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div ref={chatEndRef} />
+                        </div>
+
+                        <form onSubmit={onSendMessage} className="p-3 bg-black/40">
+                          <div className="relative">
+                            <input 
+                              value={chatInput}
+                              onChange={(e) => setChatInput(e.target.value)}
+                              placeholder="Type a message..."
+                              className="w-full bg-white/10 border border-white/10 rounded-xl py-2 pl-4 pr-10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-sky-500/50"
+                            />
+                            <button 
+                              type="submit"
+                              disabled={!chatInput.trim()}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-sky-400 disabled:opacity-30"
+                            >
+                              <Zap size={16} />
+                            </button>
+                          </div>
+                        </form>
                       </div>
                     </div>
                   ) : (
