@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { LobbyClient } from "@/components/lobby/LobbyClient";
 import RotatingHeadline from "@/components/RotatingHeadline";
 import { Navigation } from "@/components/Navigation";
@@ -362,6 +362,37 @@ export default function Home() {
   }
 
   if (session) {
+    if (!session.user.isApproved) {
+      return (
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#f7faf6] dark:bg-gray-950 p-6 text-center">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="max-w-md p-10 rounded-[40px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl"
+          >
+            <div className="w-20 h-20 rounded-full bg-[#516051]/10 text-[#516051] flex items-center justify-center mx-auto mb-8 animate-pulse">
+              <Lock size={40} />
+            </div>
+            <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 italic">Entrance Reserved</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
+              Welcome to Giggle, <span className="font-bold text-[#516051] dark:text-[#7f9b8f]">{session.user.name}</span>. <br /><br />
+              This is a private preview session. Your account is currently in the **Approval Queue**. 
+            </p>
+            <div className="p-4 rounded-2xl bg-[#f7faf6] dark:bg-black/20 border border-[#516051]/10 text-xs font-medium text-gray-400 mb-8">
+              Logged in as: {session.user.email}
+            </div>
+            <button
+              onClick={() => signOut()}
+              className="text-sm font-bold text-gray-400 hover:text-rose-500 transition-colors"
+            >
+              Sign out and try another email
+            </button>
+          </motion.div>
+          <p className="mt-10 text-[10px] uppercase tracking-[0.3em] font-black text-[#516051]/30">Giggle High-Scale Preview</p>
+        </div>
+      );
+    }
+
     return (
       <LobbyClient
         backendToken={session.backendToken || ""}

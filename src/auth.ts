@@ -32,6 +32,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.backendToken = data.token;
           token.userId = data.user?.id;
           token.isPremium = data.user?.isPremium;
+          token.isApproved = data.user?.isApproved;
         } catch (err) {
           console.error("Auth exchange failed:", err);
         }
@@ -45,6 +46,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         session.user.id = token.userId || token.sub;
         session.user.isPremium = token.isPremium || false;
+        session.user.isApproved = token.isApproved || false;
       }
       return session;
     },

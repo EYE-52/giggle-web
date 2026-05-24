@@ -7,6 +7,7 @@ declare module "next-auth" {
     user: {
       id?: string;
       isPremium?: boolean;
+      isApproved?: boolean;
     } & Session["user"];
   }
 }
@@ -16,5 +17,6 @@ declare module "next-auth/jwt" {
     backendToken?: string;
     userId?: string;
     isPremium?: boolean;
+    isApproved?: boolean;
   }
 }
