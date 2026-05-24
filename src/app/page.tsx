@@ -1,11 +1,11 @@
 "use client";
 
 import { signIn, signOut, useSession } from "next-auth/react";
-import { LobbyClient } from "@/components/lobby/LobbyClient";
+import dynamic from "next/dynamic";
 import RotatingHeadline from "@/components/RotatingHeadline";
 import { Navigation } from "@/components/Navigation";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { 
   Users, 
   Target, 
@@ -17,14 +17,29 @@ import {
   Video
 } from "lucide-react";
 
+const LobbyClient = dynamic(
+  () => import("@/components/lobby/LobbyClient").then((mod) => mod.LobbyClient),
+  { ssr: false }
+);
+
 function LandingPage() {
+  const [mounted, setMounted] = useState(false);
   const containerRef = useRef(null);
+  
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end end"]
   });
 
   const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div className="min-h-screen bg-[#f7faf6] dark:bg-gray-950" />;
+  }
 
   return (
     <div ref={containerRef} className="bg-[#f7faf6] dark:bg-gray-950 text-gray-900 dark:text-gray-100 selection:bg-[#516051] selection:text-white">
