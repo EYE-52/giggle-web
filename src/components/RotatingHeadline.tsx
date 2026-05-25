@@ -30,14 +30,14 @@ export default function RotatingHeadline() {
   return (
     <div className="overflow-hidden">
       <h2
-        className={`text-[72px] font-extrabold text-[#1b1c1a] leading-[72px] transition-all duration-500 ${
+        className={`text-4xl sm:text-6xl md:text-[72px] font-black text-[#1b1c1a] dark:text-white leading-tight md:leading-[72px] transition-all duration-500 italic ${
           isVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
         }`}
       >
         {headlines[current].main}
       </h2>
       <p
-        className={`text-[72px] font-extrabold text-[#697969] leading-[72px] transition-all duration-500 ${
+        className={`text-4xl sm:text-6xl md:text-[72px] font-black text-[#516051] dark:text-[#7f9b8f] leading-tight md:leading-[72px] transition-all duration-500 italic ${
           isVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
         }`}
       >

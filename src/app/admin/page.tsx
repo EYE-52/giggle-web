@@ -58,14 +58,14 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-[#f7faf6] dark:bg-gray-950">
       <Navigation />
-      <main className="max-w-4xl mx-auto p-10 pt-32">
-        <header className="flex items-center justify-between mb-12">
+      <main className="max-w-4xl mx-auto p-4 md:p-10 pt-24 md:pt-32">
+        <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 md:mb-12 gap-6">
           <div>
-            <h1 className="text-4xl font-black text-gray-900 dark:text-white flex items-center gap-3 italic">
-              <ShieldCheck className="text-[#516051]" size={40} />
+            <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white flex items-center gap-3 italic">
+              <ShieldCheck className="text-[#516051]" size={32} />
               Gatekeeper Panel
             </h1>
-            <p className="text-gray-500 mt-2">Manage beta access for the Colleague Release.</p>
+            <p className="text-gray-500 mt-2 text-sm">Manage beta access for the Colleague Release.</p>
           </div>
           {message && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg">
@@ -95,20 +95,20 @@ export default function AdminPage() {
                 key={user._id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-6 rounded-[32px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm flex items-center justify-between group hover:shadow-xl hover:border-[#516051]/30 transition-all duration-500"
+                className="p-4 md:p-6 rounded-[32px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between group hover:shadow-xl hover:border-[#516051]/30 transition-all duration-500 gap-4"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-[#516051]/10 flex items-center justify-center text-[#516051] font-black">
+                <div className="flex flex-row items-center gap-4 min-w-0">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#516051]/10 flex items-center justify-center text-[#516051] font-black shrink-0">
                     {user.name?.charAt(0) || "?"}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white">{user.name}</h3>
-                    <p className="text-xs text-gray-400">{user.email}</p>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-gray-900 dark:text-white truncate">{user.name}</h3>
+                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => onApprove(user._id)}
-                  className="px-6 py-3 bg-[#516051] hover:bg-black text-white rounded-2xl font-black text-sm flex items-center gap-2 transition-all"
+                  className="w-full sm:w-auto px-6 py-3 bg-[#516051] hover:bg-black text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all shrink-0"
                 >
                   <UserCheck size={16} />
                   Grant Access

@@ -116,16 +116,16 @@ export function VideoTile({ label, track, role, ready, presence, micOn, showVide
           Camera off
         </div>
       ) : null}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 text-white z-10">
-        <div className="font-bold text-shadow-sm">{label}</div>
-        <div className="mt-1.5 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider font-semibold">
-          {role ? <span className="rounded-md bg-white/20 px-2 py-0.5 backdrop-blur-md">{role}</span> : null}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2 md:p-3 text-white z-10">
+        <div className="font-bold text-shadow-sm text-xs md:text-sm truncate">{label}</div>
+        <div className="mt-1 flex flex-wrap gap-1 md:gap-2 text-[8px] md:text-[10px] uppercase tracking-wider font-semibold">
+          {role ? <span className="rounded-md bg-white/20 px-1.5 md:px-2 py-0.5 backdrop-blur-md">{role}</span> : null}
           {typeof ready === "boolean" ? (
-            <span className={`rounded-md px-2 py-0.5 backdrop-blur-md ${ready ? "bg-emerald-500/40 text-emerald-50" : "bg-amber-500/40 text-amber-50"}`}>
+            <span className={`rounded-md px-1.5 md:px-2 py-0.5 backdrop-blur-md ${ready ? "bg-emerald-500/40 text-emerald-50" : "bg-amber-500/40 text-amber-50"}`}>
               {ready ? "Ready" : "Wait"}
             </span>
           ) : null}
-          {presence ? <span className="rounded-md bg-white/20 px-2 py-0.5 backdrop-blur-md">{presence}</span> : null}
+          {presence ? <span className="hidden sm:inline-block rounded-md bg-white/20 px-1.5 md:px-2 py-0.5 backdrop-blur-md">{presence}</span> : null}
         </div>
       </div>
     </div>

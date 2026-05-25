@@ -1094,28 +1094,28 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
       transition={{ duration: 2 }}
       className="h-screen flex flex-col landing-shell overflow-hidden"
     >
-      <header className="shrink-0 landing-header border-b border-[rgba(255,255,255,0.1)] dark:border-gray-700 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <div className="text-white font-black text-2xl tracking-tighter">giggle.</div>
+      <header className="shrink-0 landing-header border-b border-[rgba(255,255,255,0.1)] dark:border-gray-700 px-4 md:px-6 py-3 flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4 md:gap-6">
+          <div className="text-white font-black text-xl md:text-2xl tracking-tighter">giggle.</div>
           <div className="w-px h-8 bg-white/10 hidden md:block" />
           <div className="flex items-center gap-3">
             {userImage ? (
-              <img src={userImage} alt="profile" className="h-8 w-8 rounded-full" />
+              <img src={userImage} alt="profile" className="h-7 w-7 md:h-8 md:w-8 rounded-full" />
             ) : (
-              <div className="h-8 w-8 rounded-full bg-[#516051] dark:bg-[#697969] flex items-center justify-center text-white text-sm font-semibold shrink-0">
+              <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-[#516051] dark:bg-[#697969] flex items-center justify-center text-white text-xs md:text-sm font-semibold shrink-0">
                 {userName?.charAt(0).toUpperCase() ?? "?"}
               </div>
             )}
             <div>
-              <p className="text-[10px] text-[#f0f2ec] dark:text-gray-300 font-bold uppercase tracking-widest opacity-60">High-Scale Session</p>
-              <h1 className="font-semibold text-sm text-white dark:text-gray-100 flex items-center gap-2">
-                Welcome, {userName}
-                {isPremium && <span className="bg-gradient-to-r from-amber-200 to-amber-500 text-amber-900 text-[10px] px-1.5 py-0.5 rounded uppercase tracking-widest">Premium</span>}
+              <p className="text-[9px] md:text-[10px] text-[#f0f2ec] dark:text-gray-300 font-bold uppercase tracking-widest opacity-60">High-Scale Session</p>
+              <h1 className="font-semibold text-xs md:text-sm text-white dark:text-gray-100 flex items-center gap-2">
+                <span className="truncate max-w-[100px] md:max-w-none">Welcome, {userName}</span>
+                {isPremium && <span className="bg-gradient-to-r from-amber-200 to-amber-500 text-amber-900 text-[8px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded uppercase tracking-widest">Premium</span>}
               </h1>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {!isPremium && (
             <button 
               className="text-xs font-bold text-amber-900 bg-gradient-to-r from-amber-200 to-amber-500 px-3 py-1.5 rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]"
@@ -1133,26 +1133,26 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 overflow-y-auto md:overflow-hidden p-2 md:p-4">
         {!squad ? (
-          <div className="h-full w-full flex items-center justify-center">
+          <div className="min-h-full w-full flex items-center justify-center py-8">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="w-full max-w-4xl grid md:grid-cols-2 gap-8 relative z-10"
+              className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 relative z-10"
             >
             {/* PATH 1: CREATE */}
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.1 }}
-              className="group relative p-8 rounded-[40px] bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 hover:border-[#516051] dark:hover:border-[#7f9b8f] transition-all duration-500 shadow-xl"
+              className="group relative p-6 md:p-8 rounded-[32px] md:rounded-[40px] bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 hover:border-[#516051] dark:hover:border-[#7f9b8f] transition-all duration-500 shadow-xl"
             >
-              <div className="w-16 h-16 rounded-3xl bg-[#516051]/10 text-[#516051] dark:text-[#7f9b8f] flex items-center justify-center mb-8 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500">
-                <Users size={32} />
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-[#516051]/10 text-[#516051] dark:text-[#7f9b8f] flex items-center justify-center mb-6 md:mb-8 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500">
+                <Users size={28} />
               </div>
-              <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-3">Initiate a Squad</h2>
-              <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-8">
+              <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-2 md:mb-3">Initiate a Squad</h2>
+              <p className="text-gray-500 dark:text-gray-400 text-xs md:text-sm leading-relaxed mb-6 md:mb-8">
                 Start a new lobby and generate a code. Invite your best friends to prepare for your first collision.
               </p>
               
@@ -1160,7 +1160,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold text-gray-400 ml-1">Lobby Display Name</label>
                   <input
-                    className="w-full rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 text-sm font-bold text-gray-900 dark:text-white focus:border-[#516051] outline-none transition-colors"
+                    className="w-full rounded-xl md:rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 md:p-4 text-sm font-bold text-gray-900 dark:text-white focus:border-[#516051] outline-none transition-colors"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Enter name..."
@@ -1169,7 +1169,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full py-4 bg-[#516051] dark:bg-[#697969] text-white rounded-2xl font-black shadow-lg shadow-[#516051]/20 hover:bg-[#405040] disabled:opacity-50 transition-all"
+                  className="w-full py-3 md:py-4 bg-[#516051] dark:bg-[#697969] text-white rounded-xl md:rounded-2xl font-black shadow-lg shadow-[#516051]/20 hover:bg-[#405040] disabled:opacity-50 transition-all text-sm md:text-base"
                   onClick={onCreateSquad}
                   disabled={loading || !displayName.trim()}
                 >
@@ -1183,13 +1183,13 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="group relative p-8 rounded-[40px] bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 hover:border-sky-500/50 transition-all duration-500 shadow-xl"
+              className="group relative p-6 md:p-8 rounded-[32px] md:rounded-[40px] bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 hover:border-sky-500/50 transition-all duration-500 shadow-xl"
             >
-              <div className="w-16 h-16 rounded-3xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-8 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500">
-                <Zap size={32} />
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-6 md:mb-8 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500">
+                <Zap size={28} />
               </div>
-              <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-3">Join a Squad</h2>
-              <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-8">
+              <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-2 md:mb-3">Join a Squad</h2>
+              <p className="text-gray-500 dark:text-gray-400 text-xs md:text-sm leading-relaxed mb-6 md:mb-8">
                 Received a code from a friend? Enter it below to instantly teleport into their squad lobby.
               </p>
 
@@ -1197,7 +1197,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold text-gray-400 ml-1">6-Digit Squad Code</label>
                   <input
-                    className="w-full rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 text-sm font-black text-gray-900 dark:text-white focus:border-sky-500 outline-none uppercase transition-colors tracking-[0.2em]"
+                    className="w-full rounded-xl md:rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 md:p-4 text-sm font-black text-gray-900 dark:text-white focus:border-sky-500 outline-none uppercase transition-colors tracking-[0.2em]"
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value)}
                     placeholder="ABC-123"
@@ -1207,7 +1207,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full py-4 bg-gray-900 dark:bg-gray-700 text-white rounded-2xl font-black shadow-lg hover:bg-black transition-all disabled:opacity-50"
+                  className="w-full py-3 md:py-4 bg-gray-900 dark:bg-gray-700 text-white rounded-xl md:rounded-2xl font-black shadow-lg hover:bg-black transition-all disabled:opacity-50 text-sm md:text-base"
                   onClick={onJoinSquad}
                   disabled={loading || inviteCode.length < 7}
                 >
@@ -1223,14 +1223,14 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
           </motion.div>
         </div>
         ) : (
-          <div className="h-full flex gap-4 overflow-hidden">
+          <div className="h-full flex flex-col md:flex-row gap-4 overflow-hidden">
             {/* LEFT: Squad Section */}
-            <div className="w-72 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
+            <div className="w-full md:w-72 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
               <div className="shrink-0 landing-header px-4 py-3 flex items-center justify-between">
                 <h2 className="font-semibold text-white text-sm">Squad</h2>
                 <span className="text-xs bg-[#7f9b8f] dark:bg-gray-600 text-[#f7faf6] dark:text-gray-200 rounded-full px-2 py-0.5">{squad.status}</span>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[300px] md:max-h-none">
 
               <div className="text-xs text-gray-600 dark:text-gray-400">
                 Squad: <span className="font-semibold text-gray-900 dark:text-gray-100">{squad.squadName}</span>
@@ -1410,7 +1410,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
             </div>
 
             {/* RIGHT: Video Lobby + Squad Members side by side */}
-            <div className="flex-1 flex gap-4 overflow-hidden">
+            <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden">
 
               {/* Video Lobby / Encounter Room */}
               <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
@@ -1418,7 +1418,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                   <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "⚔ Encounter Room" : "Video Lobby"}</h3>
                   <span className="text-xs text-[#f0f2ec] dark:text-gray-300">{participantsCount} active</span>
                 </div>
-                <div className="flex-1 overflow-hidden relative">
+                <div className="flex-1 overflow-hidden relative min-h-[300px]">
                   <AnimatePresence>
                     {isRevealing && (
                       <motion.div 
@@ -1471,7 +1471,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                   </AnimatePresence>
                   {isInEncounterChannel ? (
                     // ── ENCOUNTER SPLIT SCREEN ──────────────────────────────────
-                    <div className="h-full flex">
+                    <div className="h-full flex flex-col xl:flex-row">
+                      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto lg:overflow-hidden">
                       {/* Own squad side */}
                       <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
                         <div className="shrink-0 flex items-center gap-2">
@@ -1485,9 +1486,10 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                               ? "1fr"
                               : encounterSplitTiles.ownSquadTiles.length <= 4
                               ? "repeat(2, 1fr)"
-                              : "repeat(3, 1fr)",
+                              : "repeat(auto-fill, minmax(150px, 1fr))",
                           }}
                         >
+
                           {encounterSplitTiles.ownSquadTiles.map((tile) => (
                             <VideoTile
                               key={tile.key}
@@ -1505,8 +1507,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                         </div>
                       </div>
 
-                      {/* Divider */}
-                      <div className="shrink-0 w-px bg-white/10 self-stretch" />
+                        {/* Divider */}
+                        <div className="shrink-0 h-px xl:h-auto xl:w-px bg-white/10 self-stretch" />
 
                       {/* Opponent squad side */}
                       <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
@@ -1530,16 +1532,16 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                           )}
                         </div>
                         {encounterSplitTiles.opponentSquadTiles.length > 0 ? (
-                          <div
-                            className="flex-1 grid gap-2 content-start"
-                            style={{
-                              gridTemplateColumns: encounterSplitTiles.opponentSquadTiles.length === 1
-                                ? "1fr"
-                                : encounterSplitTiles.opponentSquadTiles.length <= 4
-                                ? "repeat(2, 1fr)"
-                                : "repeat(3, 1fr)",
-                            }}
-                          >
+                            <div
+                              className="flex-1 grid gap-2 content-start"
+                              style={{
+                                gridTemplateColumns: encounterSplitTiles.opponentSquadTiles.length === 1
+                                  ? "1fr"
+                                  : encounterSplitTiles.opponentSquadTiles.length <= 4
+                                  ? "repeat(2, 1fr)"
+                                  : "repeat(auto-fill, minmax(150px, 1fr))",
+                              }}
+                            >
                             {encounterSplitTiles.opponentSquadTiles.map((tile) => (
                               <VideoTile
                                 key={tile.key}
@@ -1557,14 +1559,14 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                             ))}
                           </div>
                         ) : (
-                          <div className="flex-1 flex items-center justify-center rounded-xl border border-[#f4c4c6] dark:border-red-600 bg-[#fdeaef] dark:bg-red-900">
+                          <div className="flex-1 flex items-center justify-center rounded-xl border border-[#f4c4c6] dark:border-red-600 bg-[#fdeaef] dark:bg-red-900 min-h-[100px]">
                             <p className="text-sm text-[#b5414d] dark:text-red-300 text-center px-4">Waiting for opponent to join encounter video...</p>
                           </div>
                         )}
                       </div>
 
                       {/* COLLISION CHAT PANE */}
-                      <div className="w-80 shrink-0 flex flex-col bg-black/20 backdrop-blur-md border-l border-white/10">
+                      <div className="w-full xl:w-80 shrink-0 flex flex-col bg-black/20 backdrop-blur-md border-t xl:border-t-0 xl:border-l border-white/10 h-64 xl:h-full">
                         <div className="p-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
                           <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Collision Chat</span>
                           <MessageSquare size={14} className="text-white/40" />
@@ -1625,7 +1627,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                           No one is in the video lobby yet
                         </div>
                       ) : (
-                        <div className="grid gap-3 grid-cols-2">
+                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                           {videoTiles
                             .filter((t) => t.presence === "In video lobby")
                             .map((tile) => (
@@ -1651,7 +1653,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
 
               {/* Squad Members sidebar — hidden during encounter to maximise video space */}
               {!isInEncounterChannel ? (
-              <div className="w-64 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
+              <div className="w-full lg:w-64 shrink-0 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800 max-h-64 lg:max-h-none">
                 <div className="shrink-0 bg-[#eef2ec] dark:bg-gray-700 border-b border-[#d8d8d0] dark:border-gray-600 px-4 py-2.5 flex items-center justify-between">
                   <h3 className="font-semibold text-sm text-[#35513f] dark:text-gray-200">Squad Members</h3>
                   <span className="text-xs text-[#4a6b5f] dark:text-gray-300 font-medium">{squad.members?.length ?? 0}</span>
