@@ -74,12 +74,12 @@ export function VideoTile({ label, track, role, ready, presence, micOn, showVide
   }, [showVideo, track]);
 
   return (
-    <div className={`relative rounded-xl border-2 transition-all duration-300 overflow-hidden aspect-video group ${
-      isSpeaking ? "border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)] scale-[1.02]" : "border-transparent bg-[#1a2119]"
+    <div className={`relative rounded-2xl border-2 transition-all duration-300 overflow-hidden aspect-video group shrink-0 w-full ${
+      isSpeaking ? "border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)] scale-[1.02] z-10" : "border-transparent bg-[#1a2119]"
     }`}>
       <div 
         ref={videoRef} 
-        className={`h-full w-full transition-all duration-1000 ${isBlurred ? "blur-2xl scale-110 grayscale" : "blur-0 scale-100 grayscale-0"}`} 
+        className={`h-full w-full transition-all duration-1000 [&>div]:!bg-transparent [&>div]:!static ${isBlurred ? "blur-2xl scale-110 grayscale" : "blur-0 scale-100 grayscale-0"}`} 
       />
       <div className="absolute right-2 top-2 flex gap-1 z-10">
         {networkQuality > 0 && (

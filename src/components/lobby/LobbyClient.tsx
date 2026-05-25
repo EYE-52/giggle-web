@@ -32,7 +32,7 @@ import { CameraStateIcon, MicStateIcon, VideoTile } from "@/components/lobby/Vid
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Zap, Info, MessageSquare } from "lucide-react";
+import { Users, Zap, Info, MessageSquare, Video } from "lucide-react";
 
 type Props = {
   backendToken: string;
@@ -1470,104 +1470,118 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                     )}
                   </AnimatePresence>
                   {isInEncounterChannel ? (
-                    // ── ENCOUNTER SPLIT SCREEN ──────────────────────────────────
-                    <div className="h-full flex flex-col xl:flex-row">
-                      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto lg:overflow-hidden">
-                      {/* Own squad side */}
-                      <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
-                        <div className="shrink-0 flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wide text-[#35513f] dark:text-green-400 bg-[#eef2ec] dark:bg-green-900 rounded-full px-2 py-0.5">{ownEncounterSquadName}</span>
-                          <span className="text-xs text-[#6a6c63] dark:text-gray-400">{encounterSplitTiles.ownSquadTiles.length} member{encounterSplitTiles.ownSquadTiles.length !== 1 ? "s" : ""}</span>
-                        </div>
-                        <div
-                          className="flex-1 grid gap-2 content-start"
-                          style={{
-                            gridTemplateColumns: encounterSplitTiles.ownSquadTiles.length === 1
-                              ? "1fr"
-                              : encounterSplitTiles.ownSquadTiles.length <= 4
-                              ? "repeat(2, 1fr)"
-                              : "repeat(auto-fill, minmax(150px, 1fr))",
-                          }}
-                        >
+                    // ── SYMMETRIC ENCOUNTER GRID ──────────────────────────────────
+                    <div className="h-full flex flex-col xl:flex-row bg-black/40">
 
-                          {encounterSplitTiles.ownSquadTiles.map((tile) => (
-                            <VideoTile
-                              key={tile.key}
-                              label={tile.label}
-                              role={tile.role}
-                              ready={tile.ready}
-                              presence={tile.presence}
-                              micOn={tile.micOn}
-                              track={tile.track}
-                              showVideo={tile.showVideo}
-                              isSpeaking={tile.isSpeaking}
-                              networkQuality={tile.networkQuality}
-                            />
-                          ))}
+                      {/* MAIN VIDEO STAGE */}
+                      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden relative">
+
+                        {/* LEFT: OWN SQUAD */}
+                        <div className="flex-1 flex flex-col min-w-0 p-4 gap-4 border-r border-white/5">
+                          <div className="shrink-0 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-md border border-emerald-400/20">Your Squad</span>
+                              <h4 className="text-sm font-bold text-white/80 truncate max-w-[120px]">{ownEncounterSquadName}</h4>
+                            </div>
+                            <span className="text-[10px] font-bold text-white/30">{encounterSplitTiles.ownSquadTiles.length} online</span>
+                          </div>
+
+                          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                            <div className={`grid gap-3 content-center h-full ${
+                              encounterSplitTiles.ownSquadTiles.length <= 1 ? "grid-cols-1 max-w-xl mx-auto" : 
+                              encounterSplitTiles.ownSquadTiles.length <= 2 ? "grid-cols-1" : 
+                              "grid-cols-2"
+                            }`}>
+                              {encounterSplitTiles.ownSquadTiles.map((tile) => (
+                                <VideoTile
+                                  key={tile.key}
+                                  label={tile.label}
+                                  role={tile.role}
+                                  ready={tile.ready}
+                                  presence={tile.presence}
+                                  micOn={tile.micOn}
+                                  track={tile.track}
+                                  showVideo={tile.showVideo}
+                                  isSpeaking={tile.isSpeaking}
+                                  networkQuality={tile.networkQuality}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* CENTER DIVIDER (VS) */}
+                        <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                          <div className="bg-white text-gray-900 w-10 h-10 rounded-full flex items-center justify-center font-black text-xs shadow-[0_0_20px_rgba(255,255,255,0.2)] border-2 border-black italic">
+                            VS
+                          </div>
+                        </div>
+
+                        {/* RIGHT: OPPONENT SQUAD */}
+                        <div className="flex-1 flex flex-col min-w-0 p-4 gap-4 bg-white/[0.02]">
+                          <div className="shrink-0 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400 bg-rose-400/10 px-2 py-1 rounded-md border border-rose-400/20">Opponent</span>
+                              <h4 className="text-sm font-bold text-white/80 truncate max-w-[120px]">{opponentEncounterSquadName}</h4>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {isLeader && (
+                                <button 
+                                  onClick={() => {
+                                    if (confirm("Report this squad for inappropriate behavior?")) {
+                                      getSocket().emit("report_squad", { squadId: matchStatus?.match?.opponentSquadId, reason: "Manual Report" });
+                                      setMessage("Squad reported. Our moderators are reviewing.");
+                                    }
+                                  }}
+                                  className="text-[10px] font-black text-rose-500 hover:text-rose-400 transition-colors uppercase"
+                                >
+                                  Report
+                                </button>
+                              )}
+                              <span className="text-[10px] font-bold text-white/30">{encounterSplitTiles.opponentSquadTiles.length} online</span>
+                            </div>
+                          </div>
+
+                          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                            {encounterSplitTiles.opponentSquadTiles.length > 0 ? (
+                              <div className={`grid gap-3 content-center h-full ${
+                                encounterSplitTiles.opponentSquadTiles.length <= 1 ? "grid-cols-1 max-w-xl mx-auto" : 
+                                encounterSplitTiles.opponentSquadTiles.length <= 2 ? "grid-cols-1" : 
+                                "grid-cols-2"
+                              }`}>
+                                {encounterSplitTiles.opponentSquadTiles.map((tile) => (
+                                  <VideoTile
+                                    key={tile.key}
+                                    label={tile.label}
+                                    role={tile.role}
+                                    ready={tile.ready}
+                                    presence={tile.presence}
+                                    micOn={tile.micOn}
+                                    track={tile.track}
+                                    showVideo={tile.showVideo}
+                                    isBlurred={tile.isBlurred}
+                                    isSpeaking={tile.isSpeaking}
+                                    networkQuality={tile.networkQuality}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="h-full flex items-center justify-center p-8">
+                                <div className="text-center space-y-3 animate-pulse">
+                                  <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto">
+                                    <Video size={20} className="text-white/20" />
+                                  </div>
+                                  <p className="text-xs font-bold text-white/20 uppercase tracking-widest leading-relaxed">Connecting to <br/>Opponent Feed...</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                        {/* Divider */}
-                        <div className="shrink-0 h-px xl:h-auto xl:w-px bg-white/10 self-stretch" />
+                      {/* COLLISION CHAT PANE */}
+                      <div className="w-full xl:w-80 shrink-0 flex flex-col bg-black/40 backdrop-blur-3xl border-t xl:border-t-0 xl:border-l border-white/5 h-64 xl:h-full">
 
-                      {/* Opponent squad side */}
-                      <div className="flex-1 flex flex-col min-w-0 p-3 gap-3">
-                        <div className="shrink-0 flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold uppercase tracking-wide text-[#944147] dark:text-red-400 bg-[#f9dedf] dark:bg-red-900 rounded-full px-2 py-0.5">{opponentEncounterSquadName}</span>
-                            <span className="text-xs text-[#6a6c63] dark:text-gray-400">{encounterSplitTiles.opponentSquadTiles.length} member{encounterSplitTiles.opponentSquadTiles.length !== 1 ? "s" : ""}</span>
-                          </div>
-                          {isLeader && (
-                            <button 
-                              onClick={() => {
-                                if (confirm("Report this squad for inappropriate behavior?")) {
-                                  getSocket().emit("report_squad", { squadId: matchStatus?.match?.opponentSquadId, reason: "Manual Report" });
-                                  setMessage("Squad reported. Our moderators are reviewing.");
-                                }
-                              }}
-                              className="text-[10px] font-bold text-rose-500 hover:text-rose-400 uppercase tracking-tighter"
-                            >
-                              Report
-                            </button>
-                          )}
-                        </div>
-                        {encounterSplitTiles.opponentSquadTiles.length > 0 ? (
-                            <div
-                              className="flex-1 grid gap-2 content-start"
-                              style={{
-                                gridTemplateColumns: encounterSplitTiles.opponentSquadTiles.length === 1
-                                  ? "1fr"
-                                  : encounterSplitTiles.opponentSquadTiles.length <= 4
-                                  ? "repeat(2, 1fr)"
-                                  : "repeat(auto-fill, minmax(150px, 1fr))",
-                              }}
-                            >
-                            {encounterSplitTiles.opponentSquadTiles.map((tile) => (
-                              <VideoTile
-                                key={tile.key}
-                                label={tile.label}
-                                role={tile.role}
-                                ready={tile.ready}
-                                presence={tile.presence}
-                                micOn={tile.micOn}
-                                track={tile.track}
-                                showVideo={tile.showVideo}
-                                isBlurred={tile.isBlurred}
-                                isSpeaking={tile.isSpeaking}
-                                networkQuality={tile.networkQuality}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex-1 flex items-center justify-center rounded-xl border border-[#f4c4c6] dark:border-red-600 bg-[#fdeaef] dark:bg-red-900 min-h-[100px]">
-                            <p className="text-sm text-[#b5414d] dark:text-red-300 text-center px-4">Waiting for opponent to join encounter video...</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* COLLISION CHAT PANE */}
-                      <div className="w-full xl:w-80 shrink-0 flex flex-col bg-black/20 backdrop-blur-md border-t xl:border-t-0 xl:border-l border-white/10 h-64 xl:h-full">
                         <div className="p-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
                           <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Collision Chat</span>
                           <MessageSquare size={14} className="text-white/40" />
