@@ -364,9 +364,9 @@ function LandingPage() {
     </div>
   );
 }
-
 export default function Home() {
   const { data: session, status } = useSession();
+  const bypassApproval = process.env.NEXT_PUBLIC_BYPASS_APPROVAL === "true";
 
   if (status === "loading") {
     return (
@@ -377,9 +377,12 @@ export default function Home() {
   }
 
   if (session) {
-    if (!session.user.isApproved) {
+    // Check if approval is required and user is not yet approved
+    if (!bypassApproval && !session.user.isApproved) {
       return (
         <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#f7faf6] dark:bg-gray-950 p-6 text-center">
+...
+
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}

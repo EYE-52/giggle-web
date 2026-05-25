@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { Navigation } from "@/components/Navigation";
 import { motion } from "framer-motion";
 import { ShieldCheck, UserCheck, Clock } from "lucide-react";
+import { BACKEND_API_BASE_URL } from "@/config/appConfig";
 
 export default function AdminPage() {
   const { data: session } = useSession();
@@ -14,7 +15,7 @@ export default function AdminPage() {
 
   const fetchPending = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001"}/api/admin/pending-users`, {
+      const res = await fetch(`${BACKEND_API_BASE_URL}/api/admin/pending-users`, {
         headers: {
           Authorization: `Bearer ${session?.backendToken}`,
         },
@@ -30,7 +31,7 @@ export default function AdminPage() {
 
   const onApprove = async (userId: string) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001"}/api/admin/approve-user/${userId}`, {
+      const res = await fetch(`${BACKEND_API_BASE_URL}/api/admin/approve-user/${userId}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session?.backendToken}`,

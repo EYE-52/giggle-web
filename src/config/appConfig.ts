@@ -1,6 +1,9 @@
 const normalizeBaseUrl = (value: string | undefined, fallback: string): string => {
-  const raw = (value || fallback).trim();
-  return raw.endsWith("/") ? raw.slice(0, -1) : raw;
+  let raw = (value || fallback).trim();
+  // Remove trailing slashes and redundant /api suffix
+  raw = raw.replace(/\/+$/, "");
+  raw = raw.replace(/\/api$/, "");
+  return raw;
 };
 
 export const BACKEND_URL = normalizeBaseUrl(
@@ -8,7 +11,7 @@ export const BACKEND_URL = normalizeBaseUrl(
   "http://localhost:3001"
 );
 
-// Source of truth for API calls. Use the host directly to allow full relative paths.
+// High-Scale API Root: Using the host directly to allow full /api/... relative paths.
 export const BACKEND_API_BASE_URL = BACKEND_URL;
 
 export const AUTH_EXCHANGE_ENDPOINT = `${BACKEND_URL}/api/auth/exchange`;
