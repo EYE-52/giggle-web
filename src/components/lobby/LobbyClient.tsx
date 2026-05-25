@@ -1564,8 +1564,9 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                           </div>
                         )}
                       </div>
+                    </div>
 
-                      {/* COLLISION CHAT PANE */}
+                    {/* COLLISION CHAT PANE */}
                       <div className="w-full xl:w-80 shrink-0 flex flex-col bg-black/20 backdrop-blur-md border-t xl:border-t-0 xl:border-l border-white/10 h-64 xl:h-full">
                         <div className="p-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
                           <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Collision Chat</span>
@@ -1575,7 +1576,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                           {chatMessages.length === 0 && (
                             <div className="h-full flex items-center justify-center text-center opacity-40">
-                              <p className="text-[10px] text-white uppercase tracking-tighter">No messages yet.<br/>Say hi to the other squad!</p>
+                              <p className="text-[10px] text-white uppercase tracking-tighter">No messages yet.<br />Say hi to the other squad!</p>
                             </div>
                           )}
                           {chatMessages.map((msg) => {
