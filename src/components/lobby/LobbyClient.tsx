@@ -32,7 +32,7 @@ import { CameraStateIcon, MicStateIcon, VideoTile } from "@/components/lobby/Vid
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Zap, Info, MessageSquare, Video } from "lucide-react";
+import { Users, Zap, Info, MessageSquare, Video, ChevronRight, ChevronLeft } from "lucide-react";
 
 type Props = {
   backendToken: string;
@@ -270,6 +270,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
   const [handoffStatus, setHandoffStatus] = useState<EncounterHandoffResponse | null>(null);
   const [isRevealing, setIsRevealing] = useState(false);
   const [revealCountdown, setRevealCountdown] = useState(0);
+  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -1580,59 +1581,84 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                       </div>
 
                       {/* COLLISION CHAT PANE */}
-                      <div className="w-full xl:w-80 shrink-0 flex flex-col bg-black/40 backdrop-blur-3xl border-t xl:border-t-0 xl:border-l border-white/5 h-64 xl:h-full">
+                      <motion.div 
+                        initial={false}
+                        animate={{ 
+                          width: isChatCollapsed ? "48px" : "320px",
+                          transition: { type: "spring", stiffness: 300, damping: 30 }
+                        }}
+                        className="relative xl:h-full shrink-0 flex flex-col bg-black/40 backdrop-blur-3xl border-t xl:border-t-0 xl:border-l border-white/5 overflow-hidden"
+                      >
+                        {/* Toggle Button */}
+                        <button 
+                          onClick={() => setIsChatCollapsed(!isChatCollapsed)}
+                          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-50 w-6 h-10 bg-[#516051] border border-white/10 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-black transition-colors"
+                        >
+                          {isChatCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+                        </button>
 
-                        <div className="p-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
+                        <div className={`p-3 border-b border-white/5 bg-white/5 flex items-center justify-between transition-opacity duration-300 ${isChatCollapsed ? "opacity-0" : "opacity-100"}`}>
                           <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Collision Chat</span>
                           <MessageSquare size={14} className="text-white/40" />
                         </div>
                         
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                          {chatMessages.length === 0 && (
-                            <div className="h-full flex items-center justify-center text-center opacity-40">
-                              <p className="text-[10px] text-white uppercase tracking-tighter">No messages yet.<br />Say hi to the other squad!</p>
-                            </div>
-                          )}
-                          {chatMessages.map((msg) => {
-                            const isMe = msg.senderId === myMember?.userId;
-                            const isOwnSquad = msg.squadId === squad?.squadId;
-                            return (
-                              <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
-                                <span className="text-[9px] font-bold text-white/40 mb-1 px-1">
-                                  {isMe ? "You" : msg.senderName} 
-                                  {!isOwnSquad && <span className="text-rose-400 ml-1">• Opponent</span>}
-                                </span>
-                                <div className={`max-w-[90%] px-3 py-2 rounded-2xl text-sm ${
-                                  isOwnSquad 
-                                    ? "bg-[#516051] text-white rounded-tr-none" 
-                                    : "bg-white/10 text-white rounded-tl-none border border-white/5"
-                                }`}>
-                                  {msg.text}
+                        {!isChatCollapsed ? (
+                          <>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                              {chatMessages.length === 0 && (
+                                <div className="h-full flex items-center justify-center text-center opacity-40">
+                                  <p className="text-[10px] text-white uppercase tracking-tighter">No messages yet.<br />Say hi to the other squad!</p>
                                 </div>
-                              </div>
-                            );
-                          })}
-                          <div ref={chatEndRef} />
-                        </div>
+                              )}
+                              {chatMessages.map((msg) => {
+                                const isMe = msg.senderId === myMember?.userId;
+                                const isOwnSquad = msg.squadId === squad?.squadId;
+                                return (
+                                  <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                                    <span className="text-[9px] font-bold text-white/40 mb-1 px-1">
+                                      {isMe ? "You" : msg.senderName} 
+                                      {!isOwnSquad && <span className="text-rose-400 ml-1">• Opponent</span>}
+                                    </span>
+                                    <div className={`max-w-[90%] px-3 py-2 rounded-2xl text-sm ${
+                                      isOwnSquad 
+                                        ? "bg-[#516051] text-white rounded-tr-none" 
+                                        : "bg-white/10 text-white rounded-tl-none border border-white/5"
+                                    }`}>
+                                      {msg.text}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              <div ref={chatEndRef} />
+                            </div>
 
-                        <form onSubmit={onSendMessage} className="p-3 bg-black/40">
-                          <div className="relative">
-                            <input 
-                              value={chatInput}
-                              onChange={(e) => setChatInput(e.target.value)}
-                              placeholder="Type a message..."
-                              className="w-full bg-white/10 border border-white/10 rounded-xl py-2 pl-4 pr-10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-sky-500/50"
-                            />
-                            <button 
-                              type="submit"
-                              disabled={!chatInput.trim()}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-sky-400 disabled:opacity-30"
-                            >
-                              <Zap size={16} />
-                            </button>
+                            <form onSubmit={onSendMessage} className="p-3 bg-black/40">
+                              <div className="relative">
+                                <input 
+                                  value={chatInput}
+                                  onChange={(e) => setChatInput(e.target.value)}
+                                  placeholder="Type a message..."
+                                  className="w-full bg-white/10 border border-white/10 rounded-xl py-2 pl-4 pr-10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-sky-500/50"
+                                />
+                                <button 
+                                  type="submit"
+                                  disabled={!chatInput.trim()}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-sky-400 disabled:opacity-30"
+                                >
+                                  <Zap size={16} />
+                                </button>
+                              </div>
+                            </form>
+                          </>
+                        ) : (
+                          <div className="flex-1 flex flex-col items-center justify-center pt-10 gap-6 opacity-40">
+                             <div className="rotate-90 origin-center whitespace-nowrap text-[10px] font-black uppercase tracking-[0.3em] text-white">
+                               Chat Hidden
+                             </div>
+                             <MessageSquare size={16} className="text-white" />
                           </div>
-                        </form>
-                      </div>
+                        )}
+                      </motion.div>
                     </div>
                   ) : (
                     // ── VIDEO LOBBY ──────────────────────────────────────────────
