@@ -1108,8 +1108,9 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
               </div>
             )}
             <div>
-              <p className="text-[9px] md:text-[10px] text-[#f0f2ec] dark:text-gray-300 font-bold uppercase tracking-widest opacity-60">High-Scale Session</p>
+              <p className="text-[10px] text-[#f0f2ec] dark:text-gray-300 font-bold uppercase tracking-widest opacity-60">Discovery Session</p>
               <h1 className="font-semibold text-xs md:text-sm text-white dark:text-gray-100 flex items-center gap-2">
+
                 <span className="truncate max-w-[100px] md:max-w-none">Welcome, {userName}</span>
                 {isPremium && <span className="bg-gradient-to-r from-amber-200 to-amber-500 text-amber-900 text-[8px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded uppercase tracking-widest">Premium</span>}
               </h1>
@@ -1357,8 +1358,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
 
                   {isLeader && squad.status === "idle" ? (
                     <ActionIconButton
-                      label="Find match"
-                      title={!canStartSearch ? "All members must be ready and in the video lobby" : "Start matchmaking"}
+                      label="Meet a Squad"
+                      title={!canStartSearch ? "All members must be ready and in the video lobby" : "Start a new discovery meetup"}
                       onClick={onStartSearch}
                       disabled={loading || !canStartSearch}
                       tone="emerald"
@@ -1388,7 +1389,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
 
                   {isLeader && encounterId ? (
                     <ActionIconButton
-                      label="Skip match"
+                      label="Next Meetup"
                       onClick={onSkipEncounter}
                       disabled={loading}
                       tone="rose"
@@ -1413,10 +1414,10 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
             {/* RIGHT: Video Lobby + Squad Members side by side */}
             <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden">
 
-              {/* Video Lobby / Encounter Room */}
+              {/* Video Lobby / Discovery Room */}
               <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
-                <div className={`shrink-0 px-4 py-2.5 flex items-center justify-between ${isInEncounterChannel ? "landing-danger" : "landing-header"}`}>
-                  <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "⚔ Encounter Room" : "Video Lobby"}</h3>
+                <div className={`shrink-0 px-4 py-2.5 flex items-center justify-between ${isInEncounterChannel ? "bg-indigo-600 shadow-[0_4px_20px_rgba(79,70,229,0.3)]" : "landing-header"}`}>
+                  <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "✨ Discovery Room" : "Video Lobby"}</h3>
                   <span className="text-xs text-[#f0f2ec] dark:text-gray-300">{participantsCount} active</span>
                 </div>
                 <div className="flex-1 overflow-hidden relative min-h-[300px]">
@@ -1443,9 +1444,9 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                             initial={{ scale: 0, rotate: -180 }}
                             animate={{ scale: 1, rotate: 0 }}
                             transition={{ type: "spring", delay: 0.5 }}
-                            className="bg-white text-gray-900 w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+                            className="bg-indigo-500 text-white w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl shadow-[0_0_30px_rgba(99,102,241,0.4)] border-2 border-white/20"
                           >
-                            VS
+                            &
                           </motion.div>
 
                           <motion.div
@@ -1454,8 +1455,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                             transition={{ type: "spring", delay: 0.2 }}
                             className="text-left"
                           >
-                            <p className="text-rose-400 text-xs uppercase tracking-widest font-bold mb-1">Opponent</p>
-                            <h2 className="text-4xl font-black text-white uppercase italic">{opponentEncounterSquadName}</h2>
+                            <p className="text-violet-400 text-xs uppercase tracking-widest font-bold mb-1">New Friends</p>
+                            <h2 className="text-2xl md:text-4xl font-black text-white uppercase italic truncate max-w-[200px]">{opponentEncounterSquadName}</h2>
                           </motion.div>
                         </div>
 
@@ -1463,10 +1464,11 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                           initial={{ scale: 0.5, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
                           key={revealCountdown}
-                          className="text-9xl font-black text-white drop-shadow-[0_0_40px_rgba(255,255,255,0.4)]"
+                          className="text-7xl md:text-9xl font-black text-white drop-shadow-[0_0_40px_rgba(255,255,255,0.4)]"
                         >
                           {revealCountdown}
                         </motion.div>
+                        <p className="mt-4 text-sm font-bold text-white/60 uppercase tracking-widest animate-pulse">Get ready to meet...</p>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -1481,7 +1483,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                         <div className="flex-1 flex flex-col min-w-0 p-4 gap-4 border-r border-white/5">
                           <div className="shrink-0 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-md border border-emerald-400/20">Your Squad</span>
+                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-md border border-emerald-400/20">Our Crew</span>
                               <h4 className="text-sm font-bold text-white/80 truncate max-w-[120px]">{ownEncounterSquadName}</h4>
                             </div>
                             <span className="text-[10px] font-bold text-white/30">{encounterSplitTiles.ownSquadTiles.length} online</span>
@@ -1511,32 +1513,32 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                           </div>
                         </div>
 
-                        {/* CENTER DIVIDER (VS) */}
+                        {/* CENTER DIVIDER (&) */}
                         <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
-                          <div className="bg-white text-gray-900 w-10 h-10 rounded-full flex items-center justify-center font-black text-xs shadow-[0_0_20px_rgba(255,255,255,0.2)] border-2 border-black italic">
-                            VS
+                          <div className="bg-white text-indigo-600 w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shadow-[0_0_20px_rgba(255,255,255,0.2)] border-2 border-indigo-100 italic">
+                            &
                           </div>
                         </div>
 
-                        {/* RIGHT: OPPONENT SQUAD */}
-                        <div className="flex-1 flex flex-col min-w-0 p-4 gap-4 bg-white/[0.02]">
+                        {/* RIGHT: NEW SQUAD */}
+                        <div className="flex-1 flex flex-col min-w-0 p-4 gap-4 bg-white/[0.01]">
                           <div className="shrink-0 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400 bg-rose-400/10 px-2 py-1 rounded-md border border-rose-400/20">Opponent</span>
+                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-400 bg-violet-400/10 px-2 py-1 rounded-md border border-violet-400/20">New Friends</span>
                               <h4 className="text-sm font-bold text-white/80 truncate max-w-[120px]">{opponentEncounterSquadName}</h4>
                             </div>
                             <div className="flex items-center gap-3">
                               {isLeader && (
                                 <button 
                                   onClick={() => {
-                                    if (confirm("Report this squad for inappropriate behavior?")) {
-                                      getSocket().emit("report_squad", { squadId: matchStatus?.match?.opponentSquadId, reason: "Manual Report" });
-                                      setMessage("Squad reported. Our moderators are reviewing.");
+                                    if (confirm("Flag this squad for a safety review?")) {
+                                      getSocket().emit("report_squad", { squadId: matchStatus?.match?.opponentSquadId, reason: "Manual Flag" });
+                                      setMessage("Safety flag sent. Our team is looking into it.");
                                     }
                                   }}
-                                  className="text-[10px] font-black text-rose-500 hover:text-rose-400 transition-colors uppercase"
+                                  className="text-[10px] font-black text-white/20 hover:text-rose-400 transition-colors uppercase tracking-tighter"
                                 >
-                                  Report
+                                  Safety Flag
                                 </button>
                               )}
                               <span className="text-[10px] font-bold text-white/30">{encounterSplitTiles.opponentSquadTiles.length} online</span>
@@ -1572,7 +1574,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                                   <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto">
                                     <Video size={20} className="text-white/20" />
                                   </div>
-                                  <p className="text-xs font-bold text-white/20 uppercase tracking-widest leading-relaxed">Connecting to <br/>Opponent Feed...</p>
+                                  <p className="text-xs font-bold text-white/20 uppercase tracking-widest leading-relaxed text-center">Welcoming<br/>New Friends...</p>
                                 </div>
                               </div>
                             )}
@@ -1580,7 +1582,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                         </div>
                       </div>
 
-                      {/* COLLISION CHAT PANE */}
+                      {/* SQUAD CHAT PANE */}
                       <motion.div 
                         initial={false}
                         animate={{ 
@@ -1592,13 +1594,13 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                         {/* Toggle Button */}
                         <button 
                           onClick={() => setIsChatCollapsed(!isChatCollapsed)}
-                          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-50 w-6 h-10 bg-[#516051] border border-white/10 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-black transition-colors"
+                          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-50 w-6 h-10 bg-indigo-600 border border-white/10 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-black transition-colors"
                         >
                           {isChatCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                         </button>
 
                         <div className={`p-3 border-b border-white/5 bg-white/5 flex items-center justify-between transition-opacity duration-300 ${isChatCollapsed ? "opacity-0" : "opacity-100"}`}>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Collision Chat</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Squad Chat</span>
                           <MessageSquare size={14} className="text-white/40" />
                         </div>
                         
@@ -1607,7 +1609,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                               {chatMessages.length === 0 && (
                                 <div className="h-full flex items-center justify-center text-center opacity-40">
-                                  <p className="text-[10px] text-white uppercase tracking-tighter">No messages yet.<br />Say hi to the other squad!</p>
+                                  <p className="text-[10px] text-white uppercase tracking-tighter">Wave hello!<br />Say hi to your new friends!</p>
                                 </div>
                               )}
                               {chatMessages.map((msg) => {
@@ -1617,11 +1619,11 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                                   <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                                     <span className="text-[9px] font-bold text-white/40 mb-1 px-1">
                                       {isMe ? "You" : msg.senderName} 
-                                      {!isOwnSquad && <span className="text-rose-400 ml-1">• Opponent</span>}
+                                      {!isOwnSquad && <span className="text-violet-400 ml-1">• New Squad</span>}
                                     </span>
                                     <div className={`max-w-[90%] px-3 py-2 rounded-2xl text-sm ${
                                       isOwnSquad 
-                                        ? "bg-[#516051] text-white rounded-tr-none" 
+                                        ? "bg-indigo-600 text-white rounded-tr-none shadow-lg" 
                                         : "bg-white/10 text-white rounded-tl-none border border-white/5"
                                     }`}>
                                       {msg.text}
