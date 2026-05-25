@@ -32,7 +32,7 @@ import { CameraStateIcon, MicStateIcon, VideoTile } from "@/components/lobby/Vid
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Zap, Info, MessageSquare, Video, ChevronRight, ChevronLeft } from "lucide-react";
+import { Users, Zap, Info, MessageSquare, Video, ChevronRight, ChevronLeft, Maximize, Minimize } from "lucide-react";
 
 type Props = {
   backendToken: string;
@@ -271,9 +271,35 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
   const [isRevealing, setIsRevealing] = useState(false);
   const [revealCountdown, setRevealCountdown] = useState(0);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullScreen = () => {
+    if (!isFullScreen) {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+      }
+      setIsChatCollapsed(true);
+      setIsSidebarCollapsed(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+    setIsFullScreen(!isFullScreen);
+  };
+
+  useEffect(() => {
+    const handleFullScreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullScreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullScreenChange);
+  }, []);
 
   const {
     joined,
@@ -1418,7 +1444,18 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
               <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
                 <div className={`shrink-0 px-4 py-2.5 flex items-center justify-between ${isInEncounterChannel ? "bg-indigo-600 shadow-[0_4px_20px_rgba(79,70,229,0.3)]" : "landing-header"}`}>
                   <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "✨ Discovery Room" : "Video Lobby"}</h3>
-                  <span className="text-xs text-[#f0f2ec] dark:text-gray-300">{participantsCount} active</span>
+                  <div className="flex items-center gap-3">
+                    {isInEncounterChannel && (
+                      <button 
+                        onClick={toggleFullScreen}
+                        className="p-1 hover:bg-white/10 rounded-md transition-colors text-white/80 hover:text-white"
+                        title={isFullScreen ? "Exit Fullscreen" : "Immersive Discovery Mode"}
+                      >
+                        {isFullScreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                      </button>
+                    )}
+                    <span className="text-xs text-[#f0f2ec] dark:text-gray-300">{participantsCount} active</span>
+                  </div>
                 </div>
                 <div className="flex-1 overflow-hidden relative min-h-[300px]">
                   <AnimatePresence>
