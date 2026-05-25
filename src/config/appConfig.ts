@@ -8,6 +8,7 @@ export const BACKEND_URL = normalizeBaseUrl(
   "http://localhost:3001"
 );
 
-export const BACKEND_API_BASE_URL = `${BACKEND_URL}/api`;
+// Source of truth for API calls. Use the host directly to allow full relative paths.
+export const BACKEND_API_BASE_URL = BACKEND_URL;
 
-export const AUTH_EXCHANGE_ENDPOINT = `${BACKEND_API_BASE_URL}/auth/exchange`;
+export const AUTH_EXCHANGE_ENDPOINT = `${BACKEND_URL}/api/auth/exchange`;
