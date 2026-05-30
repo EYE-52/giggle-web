@@ -464,8 +464,10 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
     const isSquadA = handoffStatus?.squadAId === squad.squadId;
     const opponentMembers = isSquadA ? handoffStatus?.squadBMembers : handoffStatus?.squadAMembers;
 
+    const mappedOpponentUids = new Set<number>();
     const opponentSquadTiles = (opponentMembers || []).map((member) => {
       const uid = hashStringToUid(`${uidScope}:${member.userId}`);
+      mappedOpponentUids.add(uid);
       const remoteUser = remoteUsersByUid.get(uid);
       const isSpeaking = speakingUsers.has(uid);
       const quality = networkQuality[uid] || 0;
@@ -486,11 +488,10 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
     });
 
     // Fallback for unexpected remote users not in the handoff list
-    const mappedOpponentKeys = new Set(opponentSquadTiles.map(t => t.key));
     const extraOpponentTiles = remoteUsers
       .filter((remoteUser) => {
         const uid = Number(remoteUser.uid);
-        return !knownUids.has(uid) && ![...mappedOpponentKeys].some(key => hashStringToUid(`${uidScope}:${key}`) === uid);
+        return !knownUids.has(uid) && !mappedOpponentUids.has(uid);
       })
       .map((remoteUser) => {
         const numericUid = Number(remoteUser.uid);
@@ -1474,7 +1475,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
 
               {/* Video Lobby / Discovery Room */}
               <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
-                <div className={`shrink-0 px-4 py-2.5 flex items-center justify-between ${isInEncounterChannel ? "bg-[#516051] shadow-[0_4px_20px_rgba(81,96,81,0.3)]" : "landing-header"}`}>
+                <div className={`shrink-0 px-4 py-3 flex items-center justify-between transition-colors ${isInEncounterChannel ? "landing-header shadow-[0_4px_20px_rgba(81,96,81,0.3)]" : "landing-header"}`}>
                   <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "✨ Discovery Room" : "Video Lobby"}</h3>
                   <div className="flex items-center gap-3">
                     {isInEncounterChannel && (
@@ -1593,7 +1594,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                         <div className="flex-1 flex flex-col min-w-0 p-4 gap-4 bg-white/[0.01]">
                           <div className="shrink-0 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-400 bg-violet-400/10 px-2 py-1 rounded-md border border-violet-400/20">New Friends</span>
+                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-md border border-emerald-400/20">New Friends</span>
                               <h4 className="text-sm font-bold text-white/80 truncate max-w-[120px]">{opponentEncounterSquadName}</h4>
                             </div>
                             <div className="flex items-center gap-3">
