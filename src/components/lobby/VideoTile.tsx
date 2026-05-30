@@ -96,7 +96,7 @@ export function VideoTile({ label, track, role, ready, presence, micOn, showVide
         )}
         <span
           className={`inline-flex items-center justify-center rounded-full p-1.5 ${
-            micOn ? "bg-sky-500/70 text-white" : "bg-rose-500/70 text-white"
+            micOn ? "bg-[#516051]/70 text-white" : "bg-rose-500/70 text-white"
           }`}
           title={micOn ? "Mic on" : "Mic muted"}
         >
@@ -104,7 +104,7 @@ export function VideoTile({ label, track, role, ready, presence, micOn, showVide
         </span>
         <span
           className={`inline-flex items-center justify-center rounded-full p-1.5 ${
-            showVideo ? "bg-sky-500/70 text-white" : "bg-rose-500/70 text-white"
+            showVideo ? "bg-[#516051]/70 text-white" : "bg-rose-500/70 text-white"
           }`}
           title={showVideo ? "Camera on" : "Camera off"}
         >

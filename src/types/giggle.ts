@@ -75,8 +75,20 @@ export type EncounterHandoffResponse = {
   status: "awaiting_ack" | "active" | "ended";
   squadAId: string;
   squadAName: string;
+  squadAMembers?: Array<{
+    memberId: string;
+    userId: string;
+    displayName: string;
+    role: SquadRole;
+  }>;
   squadBId: string;
   squadBName: string;
+  squadBMembers?: Array<{
+    memberId: string;
+    userId: string;
+    displayName: string;
+    role: SquadRole;
+  }>;
   ack: Record<string, boolean>;
   expiresAt: string;
 };

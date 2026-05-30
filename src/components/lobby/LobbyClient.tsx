@@ -371,7 +371,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
         key: member.memberId,
         label: member.displayName || uidToDisplayName.get(uid) || member.userId,
         role: member.role,
-        ready: member.ready,
+        // Hide ready status in encounter
+        ready: isInEncounterChannel ? undefined : member.ready,
         presence,
         micOn,
         track,
@@ -438,8 +439,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
       const track = isSelf ? localVideoTrack : remoteUser?.videoTrack || null;
       const micOn = isSelf ? Boolean(joined && isMicOn) : Boolean(remoteUser?.audioTrack);
       const showVideo = isSelf ? Boolean(localVideoTrack && isVideoOn) : Boolean(remoteUser?.videoTrack);
-      const onlineText = isInEncounterChannel ? "In encounter room" : "In video lobby";
-      const offlineText = isInEncounterChannel ? "Not in encounter room" : "Not in video lobby";
+      const onlineText = isInEncounterChannel ? "In discovery room" : "In video lobby";
+      const offlineText = isInEncounterChannel ? "Not in discovery room" : "Not in video lobby";
       // If we are not in Agora ourselves, use the backend-tracked inLobbyVideo flag
       const remoteOnline = joined ? Boolean(remoteUser) : Boolean(member.inLobbyVideo);
       const presence = isSelf ? (joined ? onlineText : offlineText) : remoteOnline ? onlineText : offlineText;
@@ -448,7 +449,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
         key: member.memberId,
         label: member.displayName || uidToDisplayName.get(uid) || member.userId,
         role: member.role,
-        ready: member.ready,
+        // Hide ready status in encounter
+        ready: isInEncounterChannel ? undefined : member.ready,
         presence,
         micOn,
         track,
@@ -458,16 +460,46 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
       };
     });
 
-    const opponentSquadTiles = remoteUsers
-      .filter((remoteUser) => !knownUids.has(Number(remoteUser.uid)))
+    // Determine which squad in handoffStatus is the opponent
+    const isSquadA = handoffStatus?.squadAId === squad.squadId;
+    const opponentMembers = isSquadA ? handoffStatus?.squadBMembers : handoffStatus?.squadAMembers;
+
+    const opponentSquadTiles = (opponentMembers || []).map((member) => {
+      const uid = hashStringToUid(`${uidScope}:${member.userId}`);
+      const remoteUser = remoteUsersByUid.get(uid);
+      const isSpeaking = speakingUsers.has(uid);
+      const quality = networkQuality[uid] || 0;
+
+      return {
+        key: member.memberId,
+        label: member.displayName,
+        role: member.role,
+        ready: undefined,
+        presence: remoteUser ? "In discovery room" : "Joining...",
+        micOn: Boolean(remoteUser?.audioTrack),
+        track: remoteUser?.videoTrack || null,
+        showVideo: Boolean(remoteUser?.videoTrack),
+        isBlurred: isRevealing,
+        isSpeaking,
+        networkQuality: quality,
+      };
+    });
+
+    // Fallback for unexpected remote users not in the handoff list
+    const mappedOpponentKeys = new Set(opponentSquadTiles.map(t => t.key));
+    const extraOpponentTiles = remoteUsers
+      .filter((remoteUser) => {
+        const uid = Number(remoteUser.uid);
+        return !knownUids.has(uid) && ![...mappedOpponentKeys].some(key => hashStringToUid(`${uidScope}:${key}`) === uid);
+      })
       .map((remoteUser) => {
         const numericUid = Number(remoteUser.uid);
         return {
-          key: `encounter-${numericUid}`,
-          label: `Encounter participant ${String(numericUid).slice(-4)}`,
+          key: `discovery-${numericUid}`,
+          label: `Friend ${String(numericUid).slice(-4)}`,
           role: "member",
           ready: undefined,
-          presence: "In encounter room",
+          presence: "In discovery room",
           micOn: Boolean(remoteUser.audioTrack),
           track: remoteUser.videoTrack || null,
           showVideo: Boolean(remoteUser.videoTrack),
@@ -477,7 +509,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
         };
       });
 
-    return { ownSquadTiles, opponentSquadTiles };
+    return { ownSquadTiles, opponentSquadTiles: [...opponentSquadTiles, ...extraOpponentTiles] };
   }, [
     isInEncounterChannel,
     isMicOn,
@@ -493,6 +525,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
     isRevealing,
     speakingUsers,
     networkQuality,
+    handoffStatus,
   ]);
 
   const ownEncounterSquadName = matchStatus?.match?.ownSquadName || squad?.squadName || "Your squad";
@@ -1181,7 +1214,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
               </div>
               <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-2 md:mb-3">Initiate a Squad</h2>
               <p className="text-gray-500 dark:text-gray-400 text-xs md:text-sm leading-relaxed mb-6 md:mb-8">
-                Start a new lobby and generate a code. Invite your best friends to prepare for your first collision.
+                Start a new lobby and generate a code. Invite your best friends to prepare for your first discovery match.
               </p>
               
               <div className="space-y-4">
@@ -1211,9 +1244,9 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="group relative p-6 md:p-8 rounded-[32px] md:rounded-[40px] bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 hover:border-sky-500/50 transition-all duration-500 shadow-xl"
+              className="group relative p-6 md:p-8 rounded-[32px] md:rounded-[40px] bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 hover:border-[#516051]/50 transition-all duration-500 shadow-xl"
             >
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-6 md:mb-8 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-[#516051]/10 text-[#516051] dark:text-[#7f9b8f] flex items-center justify-center mb-6 md:mb-8 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500">
                 <Zap size={28} />
               </div>
               <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-2 md:mb-3">Join a Squad</h2>
@@ -1225,7 +1258,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold text-gray-400 ml-1">6-Digit Squad Code</label>
                   <input
-                    className="w-full rounded-xl md:rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 md:p-4 text-sm font-black text-gray-900 dark:text-white focus:border-sky-500 outline-none uppercase transition-colors tracking-[0.2em]"
+                    className="w-full rounded-xl md:rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 md:p-4 text-sm font-black text-gray-900 dark:text-white focus:border-[#516051] outline-none uppercase transition-colors tracking-[0.2em]"
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value)}
                     placeholder="ABC-123"
@@ -1271,7 +1304,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
               {/* Tag Display */}
               <div className="flex flex-wrap gap-1 mt-1">
                 {(squad.tags || []).map(tag => (
-                  <span key={tag} className="text-[10px] bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-200 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                  <span key={tag} className="text-[10px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-md flex items-center gap-1">
                     #{tag}
                     {isLeader && (
                       <button onClick={() => onRemoveTag(tag)} className="hover:text-rose-500">×</button>
@@ -1287,10 +1320,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
               </div>
 
               {encounterId && matchStatus?.match ? (
-                <div className="text-xs text-emerald-700 dark:text-emerald-400 rounded-lg border border-[#cde2da] dark:border-emerald-600/50 bg-[#eef5f1] dark:bg-emerald-900/20 p-2">
-                  Collision: <span className="font-bold text-gray-900 dark:text-gray-100">{matchStatus.match.ownSquadName}</span>
-                  {" vs "}
-                  <span className="font-bold text-gray-900 dark:text-gray-100">{matchStatus.match.opponentSquadName}</span>
+                <div className="text-xs text-[#516051] dark:text-[#7f9b8f] rounded-lg border border-[#516051]/20 bg-emerald-50 dark:bg-emerald-900/20 p-2">
+                  Match: <span className="font-bold">{matchStatus.match.opponentSquadName}</span>
                 </div>
               ) : null}
 
@@ -1333,7 +1364,8 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                       />
                       <button
                         type="submit"
-                        className="rounded-lg bg-sky-600 px-2 py-1 text-[10px] text-white disabled:opacity-50"
+                        className="rounded-lg bg-[#516051] px-2 py-1 text-[10px] text-white disabled:opacity-50"
+
                         disabled={loading || !tagInput.trim() || (squad.tags || []).length >= 5}
                       >
                         Add
@@ -1442,7 +1474,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
 
               {/* Video Lobby / Discovery Room */}
               <div className="flex-1 flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 landing-card shadow-sm bg-white dark:bg-gray-800">
-                <div className={`shrink-0 px-4 py-2.5 flex items-center justify-between ${isInEncounterChannel ? "bg-indigo-600 shadow-[0_4px_20px_rgba(79,70,229,0.3)]" : "landing-header"}`}>
+                <div className={`shrink-0 px-4 py-2.5 flex items-center justify-between ${isInEncounterChannel ? "bg-[#516051] shadow-[0_4px_20px_rgba(81,96,81,0.3)]" : "landing-header"}`}>
                   <h3 className="font-semibold text-white text-sm">{isInEncounterChannel ? "✨ Discovery Room" : "Video Lobby"}</h3>
                   <div className="flex items-center gap-3">
                     {isInEncounterChannel && (
@@ -1473,7 +1505,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                             transition={{ type: "spring", delay: 0.2 }}
                             className="text-right"
                           >
-                            <p className="text-sky-400 text-xs uppercase tracking-widest font-bold mb-1">Your Squad</p>
+                            <p className="text-emerald-400 text-xs uppercase tracking-widest font-bold mb-1">Your Squad</p>
                             <h2 className="text-4xl font-black text-white uppercase italic">{ownEncounterSquadName}</h2>
                           </motion.div>
 
@@ -1481,7 +1513,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                             initial={{ scale: 0, rotate: -180 }}
                             animate={{ scale: 1, rotate: 0 }}
                             transition={{ type: "spring", delay: 0.5 }}
-                            className="bg-indigo-500 text-white w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl shadow-[0_0_30px_rgba(99,102,241,0.4)] border-2 border-white/20"
+                            className="bg-[#516051] text-white w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl shadow-[0_0_30px_rgba(81,96,81,0.4)] border-2 border-white/20"
                           >
                             &
                           </motion.div>
@@ -1552,7 +1584,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
 
                         {/* CENTER DIVIDER (&) */}
                         <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
-                          <div className="bg-white text-indigo-600 w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shadow-[0_0_20px_rgba(255,255,255,0.2)] border-2 border-indigo-100 italic">
+                          <div className="bg-white text-[#516051] w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shadow-[0_0_20px_rgba(255,255,255,0.2)] border-2 border-[#516051]/20 italic">
                             &
                           </div>
                         </div>
@@ -1631,7 +1663,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                         {/* Toggle Button */}
                         <button 
                           onClick={() => setIsChatCollapsed(!isChatCollapsed)}
-                          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-50 w-6 h-10 bg-indigo-600 border border-white/10 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-black transition-colors"
+                          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-50 w-6 h-10 bg-[#516051] border border-white/10 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-black transition-colors"
                         >
                           {isChatCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                         </button>
@@ -1660,7 +1692,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                                     </span>
                                     <div className={`max-w-[90%] px-3 py-2 rounded-2xl text-sm ${
                                       isOwnSquad 
-                                        ? "bg-indigo-600 text-white rounded-tr-none shadow-lg" 
+                                        ? "bg-[#516051] text-white rounded-tr-none shadow-lg" 
                                         : "bg-white/10 text-white rounded-tl-none border border-white/5"
                                     }`}>
                                       {msg.text}
@@ -1677,12 +1709,12 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                                   value={chatInput}
                                   onChange={(e) => setChatInput(e.target.value)}
                                   placeholder="Type a message..."
-                                  className="w-full bg-white/10 border border-white/10 rounded-xl py-2 pl-4 pr-10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-sky-500/50"
+                                  className="w-full bg-white/10 border border-white/10 rounded-xl py-2 pl-4 pr-10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#516051]/50"
                                 />
                                 <button 
                                   type="submit"
                                   disabled={!chatInput.trim()}
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-sky-400 disabled:opacity-30"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-400 disabled:opacity-30"
                                 >
                                   <Zap size={16} />
                                 </button>
@@ -1809,7 +1841,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
               className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[100]"
             >
               <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-gray-900/90 dark:bg-white/90 backdrop-blur-xl border border-white/10 dark:border-black/10 shadow-2xl shadow-black/50">
-                <div className="w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center text-white">
+                <div className="w-5 h-5 rounded-full bg-[#516051] flex items-center justify-center text-white">
                   <Info size={12} />
                 </div>
                 <p className="text-sm font-bold text-white dark:text-gray-900 whitespace-nowrap">

@@ -146,7 +146,7 @@ function LandingPage() {
               <div className="absolute bottom-6 left-6 right-6 p-4 rounded-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur shadow-lg z-20">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-                  <p className="text-sm font-bold uppercase tracking-widest text-[#516051] dark:text-gray-300">Live Collision</p>
+                  <p className="text-sm font-bold uppercase tracking-widest text-[#516051] dark:text-gray-300">Live Match</p>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">2 Squads | 8 Participants | #Gaming #College</p>
               </div>
@@ -166,7 +166,7 @@ function LandingPage() {
           >
             How Your Squad Meets
           </motion.h3>
-          <p className="text-gray-500 dark:text-gray-400 text-lg">Three steps from lobby to collision.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-lg">Three steps from lobby to discovery.</p>
         </div>
 
         <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-12">
@@ -185,8 +185,8 @@ function LandingPage() {
             },
             { 
               step: "03", 
-              title: "Collision", 
-              desc: "Hit 'Find Match' to initiate a collision. A 3-second cinematic countdown leads to a synchronized reveal.",
+              title: "Discovery", 
+              desc: "Hit 'Meet a Squad' to initiate discovery. A 3-second cinematic reveal leads to a friendly synchronized meetup.",
               icon: Zap
             }
           ].map((item, idx) => (
