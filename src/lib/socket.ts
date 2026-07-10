@@ -1,25 +1,27 @@
 import { io, Socket } from "socket.io-client";
-
-const SOCKET_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+import { BACKEND_URL } from "@/config/appConfig";
 
 let socket: Socket | null = null;
 
-export const getSocket = () => {
+export const getSocket = (backendToken?: string) => {
   if (!socket) {
-    socket = io(SOCKET_URL, {
+    socket = io(BACKEND_URL, {
       withCredentials: true,
       autoConnect: false,
+      auth: backendToken ? { token: backendToken } : undefined,
     });
+  } else if (backendToken) {
+    socket.auth = { token: backendToken };
   }
   return socket;
 };
 
-export const connectSocket = (squadId: string) => {
-  const s = getSocket();
+export const connectSocket = (squadId: string, backendToken: string) => {
+  const s = getSocket(backendToken);
   if (!s.connected) {
+    s.off("connect");
     s.connect();
     s.on("connect", () => {
-      console.log("Connected to WebSocket server");
       s.emit("join_squad", squadId);
     });
   } else {

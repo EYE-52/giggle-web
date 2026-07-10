@@ -1,11 +1,8 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import { MongoDBAdapter } from "@auth/mongodb-adapter";
-import clientPromise from "@/lib/db";
 import { AUTH_EXCHANGE_ENDPOINT } from "@/config/appConfig";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: MongoDBAdapter(clientPromise),
   providers: [Google],
 
   session: {
@@ -20,6 +17,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              ...(process.env.AUTH_EXCHANGE_SECRET
+                ? { "x-giggle-auth-exchange-secret": process.env.AUTH_EXCHANGE_SECRET }
+                : {}),
             },
             body: JSON.stringify({
               email: user.email,
@@ -29,12 +29,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
 
           const data = await res.json();
+
+          if (!res.ok || data?.ok === false) {
+            throw new Error(`Auth exchange failed (${res.status}): ${data?.error?.message || "Unknown backend error"}`);
+          }
+
+          if (!data?.token || !data?.user?.id) {
+            throw new Error("Auth exchange response missing token or user");
+          }
+
           token.backendToken = data.token;
           token.userId = data.user?.id;
           token.isPremium = data.user?.isPremium;
           token.isApproved = data.user?.isApproved;
         } catch (err) {
           console.error("Auth exchange failed:", err);
+          throw err;
         }
       }
       return token;

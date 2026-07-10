@@ -264,6 +264,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
   const [inviteCode, setInviteCode] = useState("");
   const [squad, setSquad] = useState<SquadState | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [pendingSafetyFlagSquadId, setPendingSafetyFlagSquadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [joiningAgora, setJoiningAgora] = useState(false);
   const [matchStatus, setMatchStatus] = useState<MatchmakingStatusResponse | null>(null);
@@ -530,6 +531,13 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
   ]);
 
   const ownEncounterSquadName = matchStatus?.match?.ownSquadName || squad?.squadName || "Your squad";
+  const opponentSquadId =
+    matchStatus?.match?.opponentSquadId ||
+    (handoffStatus
+      ? handoffStatus.squadAId === squad?.squadId
+        ? handoffStatus.squadBId
+        : handoffStatus.squadAId
+      : undefined);
   const opponentEncounterSquadName =
     matchStatus?.match?.opponentSquadName ||
     (handoffStatus
@@ -600,48 +608,52 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
 
   // WebSocket Setup
   useEffect(() => {
-    if (!squad?.squadId) return;
+    if (!squad?.squadId || !backendToken) return;
 
-    const socket = connectSocket(squad.squadId);
+    const socket = connectSocket(squad.squadId, backendToken);
 
-    socket.on("MATCH_FOUND", (data) => {
-      console.log("Match found event received:", data);
+    const onMatchFound = (data: { opponentSquadName?: string }) => {
       setMessage(`Match found with ${data.opponentSquadName}!`);
       void refreshMatchStatus();
       void refreshSquad(squad.squadId);
-    });
+    };
 
-    socket.on("ENCOUNTER_ACTIVE", (data) => {
-      console.log("Encounter active event received:", data);
+    const onEncounterActive = () => {
       void refreshMatchStatus();
       void refreshSquad(squad.squadId);
-    });
+    };
 
-    socket.on("ENCOUNTER_ENDED", (data) => {
-      console.log("Encounter ended event received:", data);
+    const onEncounterEnded = () => {
       setMessage("Encounter ended.");
       setMatchStatus(null);
       setHandoffStatus(null);
       setChatMessages([]);
       void refreshSquad(squad.squadId);
-    });
+    };
 
-    socket.on("new_message", (msg) => {
+    const onNewMessage = (msg: unknown) => {
       setChatMessages((prev) => [...prev, msg].slice(-50));
-    });
+    };
 
-    socket.on("SQUAD_UPDATED", () => {
+    const onSquadUpdated = () => {
       void refreshSquad(squad.squadId);
-    });
+    };
+
+    socket.on("MATCH_FOUND", onMatchFound);
+    socket.on("ENCOUNTER_ACTIVE", onEncounterActive);
+    socket.on("ENCOUNTER_ENDED", onEncounterEnded);
+    socket.on("new_message", onNewMessage);
+    socket.on("SQUAD_UPDATED", onSquadUpdated);
 
     return () => {
-      socket.off("MATCH_FOUND");
-      socket.off("ENCOUNTER_ACTIVE");
-      socket.off("ENCOUNTER_ENDED");
-      socket.off("SQUAD_UPDATED");
+      socket.off("MATCH_FOUND", onMatchFound);
+      socket.off("ENCOUNTER_ACTIVE", onEncounterActive);
+      socket.off("ENCOUNTER_ENDED", onEncounterEnded);
+      socket.off("new_message", onNewMessage);
+      socket.off("SQUAD_UPDATED", onSquadUpdated);
       disconnectSocket();
     };
-  }, [squad?.squadId, refreshMatchStatus, refreshSquad]);
+  }, [backendToken, squad?.squadId, refreshMatchStatus, refreshSquad]);
 
   // Fallback Polling (Reduced frequency)
   useEffect(() => {
@@ -754,7 +766,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
           uid: tokenData.uid,
         });
         
-        getSocket().emit("join_encounter", encounterId);
+        getSocket(backendToken).emit("join_encounter", encounterId);
 
         await Promise.all([
           setLobbyVideoPresence(backendToken, squad.squadId, false).catch(() => {}),
@@ -780,6 +792,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
     joined,
     joiningAgora,
     leaveLobby,
+    matchStatus?.state,
     myMember?.inLobbyVideo,
     squad,
   ]);
@@ -854,7 +867,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
     e.preventDefault();
     if (!chatInput.trim() || !encounterId || !myMember) return;
 
-    getSocket().emit("send_message", {
+    getSocket(backendToken).emit("send_message", {
       encounterId,
       text: chatInput.trim(),
       senderName: myMember.displayName,
@@ -862,6 +875,26 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
       squadId: squad?.squadId,
     });
     setChatInput("");
+  };
+
+  const onSafetyFlag = () => {
+    if (!opponentSquadId) {
+      setMessage("No opponent squad is available to flag.");
+      return;
+    }
+
+    if (pendingSafetyFlagSquadId !== opponentSquadId) {
+      setPendingSafetyFlagSquadId(opponentSquadId);
+      setMessage("Tap Safety Flag again to send this squad for review.");
+      return;
+    }
+
+    getSocket(backendToken).emit("report_squad", {
+      squadId: opponentSquadId,
+      reason: "Manual Flag",
+    });
+    setPendingSafetyFlagSquadId(null);
+    setMessage("Safety flag sent. Our team is looking into it.");
   };
 
   useEffect(() => {
@@ -1161,6 +1194,7 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
           <div className="w-px h-8 bg-white/10 hidden md:block" />
           <div className="flex items-center gap-3">
             {userImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={userImage} alt="profile" className="h-7 w-7 md:h-8 md:w-8 rounded-full" />
             ) : (
               <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-[#516051] dark:bg-[#697969] flex items-center justify-center text-white text-xs md:text-sm font-semibold shrink-0">
@@ -1178,16 +1212,6 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
-          {!isPremium && (
-            <button 
-              className="text-xs font-bold text-amber-900 bg-gradient-to-r from-amber-200 to-amber-500 px-3 py-1.5 rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-              onClick={() => {
-                alert("Giggle Premium Stripe Integration coming soon! Features: Priority Matchmaking, Premium Tags, and Encounter History.");
-              }}
-            >
-              👑 UPGRADE
-            </button>
-          )}
           <ThemeToggle />
           <button className="text-sm text-white dark:text-gray-200 hover:text-gray-300 dark:hover:text-gray-100" onClick={() => signOut()}>
             Sign out
@@ -1600,15 +1624,14 @@ export function LobbyClient({ backendToken, userName, userImage, isPremium = fal
                             <div className="flex items-center gap-3">
                               {isLeader && (
                                 <button 
-                                  onClick={() => {
-                                    if (confirm("Flag this squad for a safety review?")) {
-                                      getSocket().emit("report_squad", { squadId: matchStatus?.match?.opponentSquadId, reason: "Manual Flag" });
-                                      setMessage("Safety flag sent. Our team is looking into it.");
-                                    }
-                                  }}
-                                  className="text-[10px] font-black text-white/20 hover:text-rose-400 transition-colors uppercase tracking-tighter"
+                                  onClick={onSafetyFlag}
+                                  className={`text-[10px] font-black transition-colors uppercase tracking-tighter ${
+                                    pendingSafetyFlagSquadId === opponentSquadId
+                                      ? "text-rose-300"
+                                      : "text-white/20 hover:text-rose-400"
+                                  }`}
                                 >
-                                  Safety Flag
+                                  {pendingSafetyFlagSquadId === opponentSquadId ? "Confirm Flag" : "Safety Flag"}
                                 </button>
                               )}
                               <span className="text-[10px] font-bold text-white/30">{encounterSplitTiles.opponentSquadTiles.length} online</span>

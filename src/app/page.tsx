@@ -2,6 +2,7 @@
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import RotatingHeadline from "@/components/RotatingHeadline";
 import { Navigation } from "@/components/Navigation";
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -71,7 +72,7 @@ function LandingPage() {
             </div>
 
             <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-400 leading-relaxed max-w-3xl mx-auto mb-12">
-              Bring your friends into a private shared lobby and "collide" with another squad in real-time synchronized video encounters. 
+              Bring your friends into a private shared lobby and &ldquo;collide&rdquo; with another squad in real-time synchronized video encounters. 
               <span className="block mt-4 font-semibold text-gray-900 dark:text-white italic">Groups discovery, reimagined.</span>
             </p>
 
@@ -114,7 +115,7 @@ function LandingPage() {
                 <span className="text-[#516051] dark:text-[#7f9b8f]">Discovery is better with friends.</span>
               </h3>
               <p className="text-lg text-gray-600 dark:text-gray-400">
-                Solo chatting with strangers can be awkward and unsafe. Giggle changes the dynamic by pairing entire **Squads**. Whether you're a duo or a group of four, we match you with a group of similar size for an authentic social experience.
+                Solo chatting with strangers can be awkward and unsafe. Giggle changes the dynamic by pairing entire squads. Whether you&apos;re a duo or a group of four, we match you with a group of similar size for an authentic social experience.
               </p>
 
               <div className="grid sm:grid-cols-2 gap-6">
@@ -138,9 +139,11 @@ function LandingPage() {
               className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl shadow-[#516051]/20 border-8 border-white dark:border-gray-800"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[#516051]/20 to-transparent z-10" />
-              <img 
+              <Image 
                 src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=1200&h=800&fit=crop" 
                 alt="Friends having fun" 
+                fill
+                sizes="(min-width: 1024px) 50vw, 100vw"
                 className="w-full h-full object-cover grayscale-[0.2] hover:grayscale-0 transition-all duration-700"
               />
               <div className="absolute bottom-6 left-6 right-6 p-4 rounded-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur shadow-lg z-20">
@@ -228,15 +231,15 @@ function LandingPage() {
             </motion.div>
             <h3 className="text-4xl md:text-6xl font-black mb-6 text-gray-900 dark:text-white">Elevate Your Squad</h3>
             <p className="text-gray-500 dark:text-gray-400 text-lg max-w-2xl mx-auto">
-              Unlock the full potential of social discovery. Designed for power squads who want better connections, faster.
+              Unlock expressive social discovery tools for squads who want more identity, history, and polish.
             </p>
           </div>
 
           <div className="grid lg:grid-cols-4 gap-6">
             {[
               {
-                title: "Fast Pass",
-                desc: "Jump to the front of the matchmaking queue. Our algorithm prioritizes your squad instantly.",
+                title: "Member Badge",
+                desc: "Stand out in lobbies and encounters with a polished premium identity marker.",
                 icon: Zap
               },
               {
@@ -250,8 +253,8 @@ function LandingPage() {
                 icon: Target
               },
               {
-                title: "Crystal Clear HD",
-                desc: "Unlock 1080p high-bitrate video for the most immersive squad encounters possible.",
+                title: "Video Polish",
+                desc: "Unlock presentation upgrades and launch-ready visual polish for squad encounters.",
                 icon: Video
               }
             ].map((item, idx) => (
@@ -366,7 +369,6 @@ function LandingPage() {
 }
 export default function Home() {
   const { data: session, status } = useSession();
-  const bypassApproval = process.env.NEXT_PUBLIC_BYPASS_APPROVAL === "true";
 
   if (status === "loading") {
     return (
@@ -378,7 +380,7 @@ export default function Home() {
 
   if (session) {
     // Check if approval is required and user is not yet approved
-    if (!bypassApproval && !session.user.isApproved) {
+    if (!session.user.isApproved) {
       return (
         <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#f7faf6] dark:bg-gray-950 p-4 md:p-6 text-center">
 ...
@@ -394,7 +396,8 @@ export default function Home() {
             <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-3 md:mb-4 italic">Entrance Reserved</h2>
             <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mb-6 md:mb-8 leading-relaxed">
               Welcome to Giggle, <span className="font-bold text-[#516051] dark:text-[#7f9b8f]">{session.user.name}</span>. <br /><br />
-              This is a private preview session. Your account is currently in the **Approval Queue**. 
+              This is a private preview session. Your account is currently in the{" "}
+              <span className="font-bold text-[#516051] dark:text-[#7f9b8f]">Approval Queue</span>.
             </p>
             <div className="p-3 md:p-4 rounded-xl md:rounded-2xl bg-[#f7faf6] dark:bg-black/20 border border-[#516051]/10 text-[10px] md:text-xs font-medium text-gray-400 mb-6 md:mb-8 truncate">
               Logged in as: {session.user.email}

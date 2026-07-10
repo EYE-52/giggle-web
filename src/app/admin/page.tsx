@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Navigation } from "@/components/Navigation";
 import { motion } from "framer-motion";
 import { ShieldCheck, UserCheck, Clock } from "lucide-react";
 import { BACKEND_API_BASE_URL } from "@/config/appConfig";
+
+const CONFIGURED_ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase();
 
 export default function AdminPage() {
   const { data: session } = useSession();
@@ -13,21 +15,26 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  const fetchPending = async () => {
+  const fetchPending = useCallback(async () => {
+    if (!session?.backendToken) return;
     try {
       const res = await fetch(`${BACKEND_API_BASE_URL}/api/admin/pending-users`, {
         headers: {
-          Authorization: `Bearer ${session?.backendToken}`,
+          Authorization: `Bearer ${session.backendToken}`,
         },
       });
       const data = await res.json();
-      if (data.ok) setPendingUsers(data.data);
+      if (!res.ok || data?.ok === false) {
+        setMessage(data?.error?.message || "Admin access denied.");
+        return;
+      }
+      setPendingUsers(data.data);
     } catch (err) {
-      console.error("Failed to fetch pending users");
+      setMessage("Failed to fetch pending users.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.backendToken]);
 
   const onApprove = async (userId: string) => {
     try {
@@ -37,22 +44,36 @@ export default function AdminPage() {
           Authorization: `Bearer ${session?.backendToken}`,
         },
       });
-      if (res.ok) {
-        setPendingUsers(prev => prev.filter(u => u._id !== userId));
-        setMessage("User approved successfully!");
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) {
+        setMessage(data?.error?.message || "Approval failed. Please try again.");
         setTimeout(() => setMessage(""), 3000);
+        return;
       }
+      setPendingUsers(prev => prev.filter(u => u._id !== userId));
+      setMessage("User approved successfully!");
+      setTimeout(() => setMessage(""), 3000);
     } catch (err) {
-      alert("Approval failed");
+      setMessage("Approval failed. Please try again.");
+      setTimeout(() => setMessage(""), 3000);
     }
   };
 
   useEffect(() => {
     if (session?.backendToken) fetchPending();
-  }, [session]);
+  }, [fetchPending, session?.backendToken]);
 
-  if (!session || session.user.email !== "himanshu.builds@gmail.com") {
-    return <div className="p-20 text-center font-black">ACCESS DENIED</div>;
+  const signedInEmail = session?.user?.email?.trim().toLowerCase();
+  const blockedByFrontendGate = CONFIGURED_ADMIN_EMAIL ? signedInEmail !== CONFIGURED_ADMIN_EMAIL : false;
+
+  if (!session || blockedByFrontendGate) {
+    return (
+      <main className="min-h-screen bg-[#f7faf6] dark:bg-gray-950 flex items-center justify-center p-6 text-center">
+        <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white">
+          Access denied
+        </h1>
+      </main>
+    );
   }
 
   return (

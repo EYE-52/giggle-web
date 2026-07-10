@@ -1,4 +1,5 @@
 # Logs
+.DS_Store
 logs
 *.log
 npm-debug.log*
@@ -69,6 +70,8 @@ web_modules/
 .env
 .env.*
 !.env.example
+env-secrets
+*secrets*
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
