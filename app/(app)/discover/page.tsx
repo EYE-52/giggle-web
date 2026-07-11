@@ -123,9 +123,8 @@ export default function DiscoverPage() {
       {/* Header — cards own the page; the header carries only a light secondary
           action (join a random open squad) when there's live inventory. */}
       <PageHeader
-        eyebrow={<><Icon.discover size={13} color={violet} /> Browse</>}
         title="Discover squads"
-        subtitle="Open squads looking for members right now — preview one before you join."
+        subtitle="Find a crew that matches your mood. Preview before joining."
         right={hasOpenSquads ? (
           <button
             onClick={handleRandom}
@@ -134,14 +133,14 @@ export default function DiscoverPage() {
             onMouseLeave={() => setCtaHover(false)}
             className="gg-press"
             style={{
-              height: 44, padding: "0 20px", borderRadius: 999, border: "none", cursor: randomLoading ? "wait" : "pointer",
-              background: ctaHover ? "var(--violet-bright)" : violet, color: "var(--on-accent)",
+              height: 44, padding: "0 16px", borderRadius: 10, border: "1px solid var(--border-strong)", cursor: randomLoading ? "wait" : "pointer",
+              background: ctaHover ? "var(--overlay-hover)" : "transparent", color: "var(--text)",
               fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 14,
-              boxShadow: "0 0 24px -8px rgba(124,92,255,0.8)", opacity: randomLoading ? 0.85 : 1,
+              opacity: randomLoading ? 0.75 : 1,
               display: "inline-flex", alignItems: "center", gap: 8,
             }}
           >
-            {randomLoading ? (<><span className="gg-spinner" /> Finding…</>) : (<><Icon.lightning size={15} color="var(--on-accent)" /> Join random</>)}
+            {randomLoading ? (<><span className="gg-spinner" /> Finding…</>) : (<><Icon.lightning size={15} color="var(--violet)" /> Surprise me</>)}
           </button>
         ) : undefined}
       />
@@ -188,20 +187,16 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      {/* ── OPEN SQUADS ───────────────────────────────────────────── */}
+      {/* Active filter + result count */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
-          <Icon.trend size={18} color="var(--lime)" />
-          <h2 style={{ margin: 0, fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 18, color: text, letterSpacing: "-0.01em" }}>
-            {vibe ? "Open squads" : "Open squads"}
-          </h2>
           {vibe && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--violet-soft)", border: "1px solid rgba(124,92,255,0.3)", color: "var(--violet)", borderRadius: 999, padding: "4px 8px 4px 12px", fontSize: 13, fontWeight: 700 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--overlay)", border: "1px solid var(--border-strong)", color: "var(--text)", borderRadius: 9, padding: "6px 8px 6px 11px", fontSize: 13, fontWeight: 700 }}>
               {vibe}
               <button
                 onClick={() => { setVibe(null); try { window.history.replaceState(null, "", "/discover"); } catch {} }}
                 aria-label="Clear vibe filter"
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--violet)", padding: 0, display: "flex" }}
+                style={{ width: 28, height: 28, background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", placeItems: "center" }}
               >
                 <Icon.close size={13} color="var(--violet)" />
               </button>
@@ -270,6 +265,7 @@ export default function DiscoverPage() {
           vibe filter. No page-dominating dashed box. */}
       {!loading && !error && shown.length === 0 && (
         <EmptyState
+          compact={!isPhone}
           icon={<Icon.discover size={20} color="var(--text-dim)" />}
           title={vibe ? `No open “${vibe}” squads right now` : "No open squads right now"}
           body={vibe ? "Start one with this vibe, or clear the filter to browse other live signals." : "Start the first open room and make your squad discoverable."}

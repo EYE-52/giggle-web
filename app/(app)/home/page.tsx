@@ -29,6 +29,7 @@ export default function HomePage() {
   const [stats, setStats] = useState<{ liveEncounters: number } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [mySquads, setMySquads] = useState<MySquadLite[]>([]);
+  const [mySquadsLoading, setMySquadsLoading] = useState(true);
   const [trending, setTrending] = useState<PublicSquad[] | null>(null);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [tokenBal, setTokenBal] = useState(0);
@@ -60,6 +61,7 @@ export default function HomePage() {
         const { squads } = await api.mySquads();
         setMySquads(squads ?? []);
       } catch {/* not signed in / none yet — section renders its empty state */}
+      finally { setMySquadsLoading(false); }
     })();
   }, []);
 
@@ -148,29 +150,24 @@ export default function HomePage() {
     <div className="gg-reveal" style={{ display: "flex", flexDirection: "column", paddingBottom: 48 }}>
 
       {/* ── GREETING + LIVE STRIP ─────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24, flexWrap: "wrap", marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, flexWrap: "wrap", marginBottom: 26 }}>
         <div style={{ minWidth: 0, maxWidth: 560 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: 9 }}>
-            <span style={{ width: 6, height: 6, borderRadius: 999, background: "var(--lime)", boxShadow: "0 0 10px var(--lime)" }} />
-            Squad control room
-          </div>
           <h1 style={{ margin: 0, fontFamily: "var(--font-space-grotesk)", fontWeight: 800, fontSize: isPhone ? 26 : 30, color: "var(--text)", letterSpacing: "-0.02em", lineHeight: 1.05 }}>
-            {firstName ? <>Welcome back, <span style={{ color: "var(--violet)" }}>{firstName}</span>.</> : "Welcome back."}
+            {firstName ? <>Hey, {firstName}.</> : "Welcome back."}
           </h1>
           <p style={{ margin: "7px 0 0", fontSize: isPhone ? 14 : 14.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            Resume a room, open a fresh one, or match with a crew that shares your vibe.
+            Pick up where your squad left off.
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "stretch", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 15, boxShadow: "var(--elev)", overflow: "hidden" }}>
+        <div aria-label="Live activity" style={{ display: "flex", alignItems: "center", gap: isPhone ? 16 : 24 }}>
           {[
-            { k: "Your squads", v: String(mySquads.length), live: false },
+            { k: "Your squads", v: mySquadsLoading ? "—" : String(mySquads.length), live: false },
             { k: "Open signals", v: trending === null ? "—" : String(openSignals), live: false },
             { k: "Live now", v: String(stats?.liveEncounters ?? 0), live: true },
           ].map((s, i) => (
-            <div key={s.k} style={{ padding: "12px 18px", display: "flex", flexDirection: "column", gap: 2, minWidth: 92, borderLeft: i > 0 ? "1px solid var(--border)" : "none" }}>
+            <div key={s.k} style={{ display: "flex", alignItems: "baseline", gap: 7, paddingLeft: i > 0 ? 20 : 0, borderLeft: i > 0 ? "1px solid var(--border)" : "none" }}>
               <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-dim)" }}>{s.k}</span>
-              <span style={{ fontFamily: "var(--font-space-grotesk)", fontWeight: 800, fontSize: 21, letterSpacing: "-0.02em", color: s.live ? "var(--lime-text)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-                {s.live && <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 999, background: "var(--lime)", boxShadow: "0 0 10px var(--lime)", marginRight: 5, verticalAlign: "middle" }} />}
+              <span style={{ fontFamily: "var(--font-space-grotesk)", fontWeight: 800, fontSize: 18, color: s.live ? "var(--lime-text)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
                 {s.v}
               </span>
             </div>
@@ -178,44 +175,25 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── COMMAND BAR: the two entry actions, consolidated ──────── */}
-      <div style={{ display: "grid", gridTemplateColumns: isTablet ? "1fr" : "1.1fr 1fr", gap: 14, marginBottom: 26 }}>
-        {/* Create */}
-        <div style={{ position: "relative", overflow: "hidden", borderRadius: 18, padding: "18px 20px", display: "flex", alignItems: "center", gap: 16, background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--elev)" }}>
-          <div style={{ position: "absolute", left: 0, top: 14, bottom: 14, width: 3, borderRadius: 3, background: "var(--violet)" }} />
-          <div style={{ width: 46, height: 46, borderRadius: 13, display: "grid", placeItems: "center", flexShrink: 0, background: "var(--violet)", boxShadow: "0 0 22px -6px rgba(118,87,255,0.85)" }}>
-            <Icon.plus size={22} color="#fff" strokeWidth={2.6} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 17, letterSpacing: "-0.01em", color: "var(--text)" }}>Open a new room</div>
-            <div style={{ marginTop: 2, fontSize: 12.5, color: "var(--text-muted)" }}>Start a squad, set a vibe, and go live in seconds.</div>
-          </div>
-          <button onClick={handleCreate} disabled={creating} className="gg-press" style={{ ...primaryBtn, height: 44, padding: "0 22px", width: "auto", opacity: creating ? 0.85 : 1 }}>
-            {creating ? (<><span className="gg-spinner" /> Creating…</>) : "Create Squad"}
+      <div aria-label="Squad actions" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 28 }}>
+        <button onClick={handleCreate} disabled={creating} className="gg-press" style={{ ...primaryBtn, width: "auto", height: 46, padding: "0 20px", borderRadius: 11, opacity: creating ? 0.8 : 1 }}>
+          <Icon.plus size={17} color="#fff" />
+          {creating ? "Creating…" : "Create squad"}
+        </button>
+        <div style={{ display: "flex", flex: isPhone ? "1 1 100%" : "0 1 310px", minWidth: isPhone ? 0 : 260 }}>
+          <input
+            aria-label="Squad invite code"
+            value={squadCode}
+            onChange={e => { setSquadCode(formatSquadCodeInput(e.target.value)); if (actionError) setActionError(null); }}
+            onKeyDown={e => { if (e.key === "Enter") handleJoin(); }}
+            placeholder="Join with code"
+            autoCapitalize="characters" autoComplete="off" spellCheck={false} inputMode="text"
+            onFocus={() => setSquadCodeFocused(true)} onBlur={() => setSquadCodeFocused(false)}
+            style={{ minWidth: 0, flex: 1, height: 46, borderRadius: "11px 0 0 11px", background: "transparent", border: squadCodeFocused ? "1px solid var(--violet)" : "1px solid var(--border-strong)", outline: "none", color: "var(--text)", padding: "0 14px", fontSize: 13.5, fontFamily: "var(--font-inter)" }}
+          />
+          <button aria-label="Join squad" onClick={handleJoin} disabled={joining || !isValidSquadCode(squadCode)} className="gg-press" style={{ width: 48, height: 46, borderRadius: "0 11px 11px 0", border: "1px solid var(--border-strong)", borderLeft: 0, background: "var(--overlay)", cursor: "pointer", opacity: joining || !isValidSquadCode(squadCode) ? 0.45 : 1 }}>
+            {joining ? <span className="gg-spinner" /> : <Icon.enter size={18} color="var(--text)" />}
           </button>
-        </div>
-        {/* Join */}
-        <div style={{ borderRadius: 18, padding: "18px 20px", display: "flex", alignItems: "center", gap: 16, background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--elev)" }}>
-          <div style={{ width: 46, height: 46, borderRadius: 13, display: "grid", placeItems: "center", flexShrink: 0, background: "var(--overlay)", boxShadow: "inset 0 0 0 1px var(--border)" }}>
-            <Icon.enter size={20} color="var(--text-muted)" />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 17, letterSpacing: "-0.01em", color: "var(--text)" }}>Join with a code</div>
-            <div style={{ display: "flex", gap: 9, marginTop: 10 }}>
-              <input
-                value={squadCode}
-                onChange={e => { setSquadCode(formatSquadCodeInput(e.target.value)); if (actionError) setActionError(null); }}
-                onKeyDown={e => { if (e.key === "Enter") handleJoin(); }}
-                placeholder="ENTER-CODE"
-                autoCapitalize="characters" autoComplete="off" spellCheck={false} inputMode="text"
-                onFocus={() => setSquadCodeFocused(true)} onBlur={() => setSquadCodeFocused(false)}
-                style={{ flex: 1, height: 44, borderRadius: 12, background: "var(--overlay)", border: squadCodeFocused ? "1px solid var(--violet)" : "1px solid var(--border-strong)", boxShadow: squadCodeFocused ? "0 0 0 3px color-mix(in srgb, var(--violet) 30%, transparent)" : "none", outline: "none", color: "var(--text)", padding: "0 14px", fontSize: 14, letterSpacing: "0.12em", fontFamily: "var(--font-space-grotesk)", transition: "box-shadow .2s var(--ease-ui), border-color .2s var(--ease-ui)" }}
-              />
-              <button onClick={handleJoin} disabled={joining || !isValidSquadCode(squadCode)} className="gg-press" style={{ ...primaryBtn, width: "auto", padding: "0 20px", height: 44, minWidth: 72, opacity: joining || !isValidSquadCode(squadCode) ? 0.55 : 1 }}>
-                {joining ? <span className="gg-spinner" /> : "Enter"}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -243,7 +221,21 @@ export default function HomePage() {
             )}
           </div>
 
-          {mySquads.length === 0 ? (
+          {mySquadsLoading ? (
+            <div aria-label="Loading your squads" style={{ height: 160, boxSizing: "border-box", padding: 16, borderRadius: 18, border: "1px solid var(--border)", background: "var(--surface)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <span className="gg-shimmer" style={{ width: 70, height: 22, borderRadius: 7 }} />
+                <span className="gg-shimmer" style={{ width: 44, height: 22, borderRadius: 7 }} />
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 18 }}>
+                <div style={{ flex: 1, display: "grid", gap: 8 }}>
+                  <span className="gg-shimmer" style={{ width: "42%", minWidth: 120, height: 20, borderRadius: 6 }} />
+                  <span className="gg-shimmer" style={{ width: "28%", minWidth: 84, height: 12, borderRadius: 5 }} />
+                </div>
+                <span className="gg-shimmer" style={{ width: 76, height: 40, borderRadius: 999 }} />
+              </div>
+            </div>
+          ) : mySquads.length === 0 ? (
             <EmptyState
               icon={<Icon.account size={20} color="var(--text-dim)" />}
               title="No squads yet"
@@ -265,7 +257,7 @@ export default function HomePage() {
                   onLeave={() => handleLeaveSquad(promoted.squadId)}
                 />
               )}
-              <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "1fr 1fr", gap: 14, marginTop: promoted ? 14 : 0 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isPhone || restSquads.length === 1 ? "1fr" : "1fr 1fr", gap: 14, marginTop: promoted ? 14 : 0 }}>
                 {restSquads.map(s => (
                   <SquadTile
                     key={s.squadId}
@@ -279,12 +271,6 @@ export default function HomePage() {
                     onLeave={() => handleLeaveSquad(s.squadId)}
                   />
                 ))}
-                <button onClick={handleCreate} className="gg-press-card" style={{ minHeight: 130, borderRadius: 18, border: "1px dashed var(--border-strong)", background: "var(--surface)", color: "var(--text-muted)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}>
-                  <span style={{ width: 38, height: 38, borderRadius: 12, background: "var(--overlay)", display: "grid", placeItems: "center", boxShadow: "inset 0 0 0 1px var(--border)" }}>
-                    <Icon.plus size={20} color="var(--violet)" />
-                  </span>
-                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>New squad</span>
-                </button>
               </div>
             </>
           )}
@@ -302,7 +288,7 @@ export default function HomePage() {
               [0, 1, 2].map(i => <div key={i} className="gg-shimmer" style={{ height: 62, borderTop: "1px solid var(--border)" }} />)
             ) : trending.length === 0 ? (
               <div style={{ padding: "16px", borderTop: "1px solid var(--border)", color: "var(--text-muted)", fontSize: 13 }}>
-                No open squads right now. <button onClick={handleCreate} style={{ ...linkBtn, color: "var(--violet)" }}>Open one →</button>
+                No open squads right now.
               </div>
             ) : (
               trending.slice(0, 5).map(sq => {
@@ -334,15 +320,11 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Find a match */}
-          <div style={{ marginTop: 18, position: "relative", overflow: "hidden", borderRadius: 18, padding: 18, background: "var(--surface)", border: "1px solid var(--border-strong)", boxShadow: "var(--elev)" }}>
-            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(80% 60% at 90% 10%, rgba(47,230,200,0.10), transparent 60%)", pointerEvents: "none" }} />
-            <h3 style={{ position: "relative", margin: 0, fontFamily: "var(--font-space-grotesk)", fontWeight: 800, fontSize: 16, color: "var(--text)", letterSpacing: "-0.01em" }}>Ready to meet a new crew?</h3>
-            <p style={{ position: "relative", margin: "5px 0 0", fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.45 }}>Skip the browsing — open a squad, then match with a crew that shares your vibe.</p>
-            <button onClick={() => (promoted || mySquads[0]) ? router.push(`/lobby?squad=${(promoted || mySquads[0]).squadId}`) : handleCreate()} className="gg-press" style={{ position: "relative", marginTop: 14, width: "100%", height: 46, border: "none", borderRadius: 999, background: "var(--lime)", color: "var(--on-accent)", fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 0 26px -10px rgba(183,255,42,0.6)" }}>
-              {mySquads.length ? "Find a Match" : "Create a squad to match"}
+          {mySquads.length > 0 && (
+            <button onClick={() => router.push(`/lobby?squad=${(promoted || mySquads[0]).squadId}`)} className="gg-press" style={{ marginTop: 12, width: "100%", height: 46, border: "1px solid var(--border-strong)", borderRadius: 12, background: "transparent", color: "var(--text)", fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+              Find a Match
             </button>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -365,7 +347,7 @@ function SquadTile({
 }) {
   const statusLabel = MY_STATUS_LABEL[squad.status] ?? squad.status;
   const isLive = squad.status === "in_encounter";
-  const theme = coverName(squad.coverImage);
+  const theme = coverName(squad.coverImage) ?? "Aurora";
 
   return (
     <div
@@ -377,7 +359,7 @@ function SquadTile({
       className="gg-focusable gg-press-card"
       style={{
         position: "relative", overflow: "hidden", borderRadius: 18, cursor: "pointer",
-        minHeight: promoted ? undefined : 130,
+        minHeight: promoted ? undefined : 160,
         padding: promoted ? "20px 22px" : 15,
         border: hovered ? "1px solid var(--border-strong)" : "1px solid var(--border)",
         boxShadow: hovered ? "0 16px 40px -22px rgba(0,0,0,0.7)" : "var(--elev)",
@@ -388,29 +370,29 @@ function SquadTile({
     >
       {/* cover + legibility scrim — the cover reads as a moody, muted backdrop
           (identity, not glare): desaturated + a strong dark gradient. */}
-      <div style={{ position: "absolute", inset: 0, background: resolveCover(squad.coverImage), filter: "saturate(0.85) brightness(0.75)" }} />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(8,8,11,0.97) 24%, rgba(8,8,11,0.82) 58%, rgba(8,8,11,0.55) 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: resolveCover(squad.coverImage), filter: "saturate(0.9) brightness(0.8)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(8,8,11,0.94) 18%, rgba(8,8,11,0.58) 58%, rgba(8,8,11,0.2) 100%)" }} />
 
       {/* top row: status + members + theme + leave */}
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 999, background: "rgba(8,8,11,0.55)", backdropFilter: "blur(6px)", boxShadow: isLive ? "inset 0 0 0 1px rgba(183,255,42,0.5)" : "inset 0 0 0 1px rgba(255,255,255,0.16)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 8px", borderRadius: 7, background: "rgba(8,8,11,0.62)", boxShadow: isLive ? "inset 0 0 0 1px rgba(183,255,42,0.5)" : "inset 0 0 0 1px rgba(255,255,255,0.14)" }}>
             {isLive && <span style={{ width: 6, height: 6, borderRadius: 999, background: "#C2FF3D", boxShadow: "0 0 8px #C2FF3D" }} />}
             <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", color: isLive ? "#C2FF3D" : "#E7E7F0", textTransform: "uppercase" }}>{isLive ? "Live now" : statusLabel}</span>
           </span>
           {theme && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 8px", borderRadius: 7, background: "rgba(8,8,11,0.5)", backdropFilter: "blur(6px)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.14)", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#E7E7F0" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#C9C9DA" }}>
               <span style={{ width: 9, height: 9, borderRadius: 3, background: coverSwatch(squad.coverImage), boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.35)" }} />
               {theme}
             </span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 999, background: "rgba(8,8,11,0.55)", backdropFilter: "blur(6px)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#C9C9DA" }}>
             <Icon.account size={12} color="#E7E7F0" />
             <span style={{ fontSize: 11.5, fontWeight: 700, color: "#E7E7F0", fontVariantNumeric: "tabular-nums" }}>{squad.memberCount}/{squad.maxSlots}</span>
           </span>
-          <button onClick={e => { e.stopPropagation(); onAskLeave(); }} aria-label={`Leave ${squad.squadName}`} title="Leave squad" className="gg-press" style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 999, border: "none", background: "rgba(8,8,11,0.5)", backdropFilter: "blur(6px)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)", cursor: "pointer", display: "grid", placeItems: "center" }}>
+          <button onClick={e => { e.stopPropagation(); onAskLeave(); }} aria-label={`Leave ${squad.squadName}`} title="Leave squad" className="gg-press" style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 9, border: "none", background: "transparent", cursor: "pointer", display: "grid", placeItems: "center" }}>
             <Icon.close size={13} color="#E7E7F0" />
           </button>
         </div>
@@ -434,9 +416,11 @@ function SquadTile({
             {squad.leaderName ? `Led by ${squad.leaderName}` : (squad.myRole === "leader" ? "You lead this" : "Your squad")}
           </div>
           {squad.tags && squad.tags.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-              {squad.tags.slice(0, promoted ? 4 : 2).map(t => (
-                <span key={t} style={{ fontSize: 11, fontWeight: 600, color: "#E7E7F0", background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 999, padding: "2px 9px" }}>{t}</span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 0, marginTop: 8, color: "#C9C9DA" }}>
+              {squad.tags.slice(0, promoted ? 4 : 2).map((t, index, visibleTags) => (
+                <span key={t} style={{ fontSize: 11, fontWeight: 600 }}>
+                  {t}{index < visibleTags.length - 1 ? <span aria-hidden style={{ margin: "0 7px", color: "#777789" }}>·</span> : null}
+                </span>
               ))}
             </div>
           )}
