@@ -222,7 +222,7 @@ export function CoverPicker({ squadId, currentCover, onClose, onSaved }: CoverPi
           >
             <Icon.shield size={16} color={violet} />
             <span style={{ flex: 1, fontSize: 12.5, color: "var(--text)", fontWeight: 600 }}>
-              Premium covers locked — unlock with tokens or Giggle+
+              Premium covers locked — unlock with tokens
             </span>
             <span style={{ background: violet, color: "#fff", borderRadius: 999, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>
               Unlock

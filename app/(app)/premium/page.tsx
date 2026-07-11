@@ -30,7 +30,7 @@ const SUB_PLANS = [
 export default function PremiumPage() {
   const router = useRouter();
   const { isPhone, isTablet } = useViewport();
-  const [entitlements, setEntitlements] = useState<Entitlements>({ premium: false, boosts: {}, activePerks: {} });
+  const [entitlements, setEntitlements] = useState<Entitlements>({ premium: false, activePerks: {} });
   const [tokenBalance, setTokenBalance] = useState(0);
   const [plan, setPlan] = useState<"monthly" | "yearly">("monthly");
 
@@ -270,14 +270,14 @@ export default function PremiumPage() {
             </div>
             <div style={{ color: muted, fontSize: 13, marginTop: 4 }}>
               {canRedeemPerks
-                ? "Redeem tokens for cosmetics. Premium members will get included cosmetic unlocks when plans launch."
+                ? "Redeem tokens for cosmetics. Giggle+ members get a monthly token stipend to spend here."
                 : "Perk redemption is in launch prep. Tokens are tracked now; server-backed cosmetic unlocks will arrive with checkout."}
             </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: perksCols, gap: 14 }}>
             {TOKEN_PERKS.map(perk => {
-              const canAfford = entitlements.premium || tokenBalance >= perk.tokenCost;
+              const canAfford = tokenBalance >= perk.tokenCost;
               const hovered = perkHover === perk.id;
               const loading = spendLoading === perk.id;
               const need = perk.tokenCost - tokenBalance;
@@ -326,10 +326,6 @@ export default function PremiumPage() {
                         {!canAfford ? (
                           <span style={{ color: dim, fontSize: 11, fontWeight: 500 }}>
                             Need {need} more token{need !== 1 ? "s" : ""}
-                          </span>
-                        ) : entitlements.premium ? (
-                          <span style={{ color: "var(--lime-text)", fontSize: 11, fontWeight: 600 }}>
-                            Free with Giggle+
                           </span>
                         ) : null}
                       </div>
@@ -388,7 +384,7 @@ export default function PremiumPage() {
               }}>Best value</span>
             </div>
             <div style={{ color: muted, fontSize: 13, marginTop: 4 }}>
-              Monthly token stipend + premium cosmetics, all included when plans launch.
+              Monthly token stipend + 15% bonus on every token pack you buy.
             </div>
           </div>
 
@@ -417,7 +413,7 @@ export default function PremiumPage() {
                 <div style={{ color: muted, fontSize: 13, marginTop: 3 }}>
                   {entitlements.premiumUntil
                     ? `Renews ${new Date(entitlements.premiumUntil).toLocaleDateString()}`
-                    : "All perks unlocked. You receive 200 tokens each billing cycle."}
+                    : "You receive 200 tokens each billing cycle, plus 15% bonus on packs."}
                 </div>
               </div>
             </div>
@@ -486,7 +482,7 @@ export default function PremiumPage() {
                   {[
                     { icon: "lightning" as const, color: violet, label: "200 tokens / month", sub: "Use on any perk, roll over not included" },
                     { icon: "star" as const, color: violet, label: "Member badge", sub: "Stand out across squads and invites" },
-                    { icon: "shield" as const, color: "#FFB020", label: "Premium cosmetics", sub: "Exclusive cover themes, vibe packs & badges" },
+                    { icon: "shield" as const, color: "#FFB020", label: "15% pack bonus", sub: "Extra tokens on every token pack you buy" },
                     { icon: "hd" as const, color: "#38bdf8", label: "Video polish", sub: "Launch-ready video upgrades preview" },
                   ].map(({ icon, color, label, sub }) => {
                     const IconComp = Icon[icon];
