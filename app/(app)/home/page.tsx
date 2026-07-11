@@ -426,13 +426,20 @@ function SquadTile({
         </div>
       )}
 
-      {/* bottom: name + open */}
+      {/* bottom: name + vibes + open */}
       <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: promoted ? 22 : 18, color: "#F4F4F7", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{squad.squadName}</div>
           <div style={{ fontSize: 12, color: "#C9C9DA", marginTop: 2 }}>
             {squad.leaderName ? `Led by ${squad.leaderName}` : (squad.myRole === "leader" ? "You lead this" : "Your squad")}
           </div>
+          {squad.tags && squad.tags.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+              {squad.tags.slice(0, promoted ? 4 : 2).map(t => (
+                <span key={t} style={{ fontSize: 11, fontWeight: 600, color: "#E7E7F0", background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 999, padding: "2px 9px" }}>{t}</span>
+              ))}
+            </div>
+          )}
         </div>
         <button onClick={e => { e.stopPropagation(); onOpen(); }} className="gg-press" style={{ flexShrink: 0, height: 40, padding: "0 18px", borderRadius: 999, border: "none", cursor: "pointer", background: "var(--violet)", color: "#fff", fontFamily: "var(--font-inter)", fontWeight: 700, fontSize: 13.5, boxShadow: "0 0 18px -8px rgba(118,87,255,0.8)" }}>
           {isLive ? "Rejoin" : "Open"}
