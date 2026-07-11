@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Icon } from "@/components/Icons";
-import { resolveCover, type PublicSquad } from "@giggle/core";
+import { resolveCover, coverName, coverSwatch, type PublicSquad } from "@giggle/core";
 
 // Deterministic tasteful gradient fallback keyed off the squad id/name — same
 // visual language as the Home "Trending Vibes" VenueCard so the two read as one
@@ -43,6 +43,7 @@ export function SquadCard({
   const isLive = squad.status === "in_encounter";
   const isRequest = squad.joinPolicy === "request";
   const btnLabel = isRequest ? "Request to join" : "View / Join";
+  const theme = coverName(squad.coverImage);
 
   // Clicking the card (or its button) NO LONGER joins directly — it opens the
   // two-step preview so members can vet themes + roster before committing.
@@ -117,6 +118,12 @@ export function SquadCard({
       {/* Bottom overlay: name + leader + tags + Join (matches VenueCard layout) */}
       <div style={{ position: "absolute", left: 16, right: 16, bottom: 14, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
+          {theme && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 7, padding: "3px 8px", borderRadius: 7, background: "rgba(8,8,11,0.5)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.14)", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#E7E7F0" }}>
+              <span style={{ width: 9, height: 9, borderRadius: 3, background: coverSwatch(squad.coverImage), boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.35)" }} />
+              {theme}
+            </span>
+          )}
           <div style={{ fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 19, color: "#F4F4F7", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {squad.squadName}
           </div>

@@ -98,11 +98,6 @@ export default function ProfilePage() {
     padding: isPhone ? "16px 16px" : "20px 24px",
     boxShadow: "var(--elev)",
   };
-  const iconTile = (color: string): React.CSSProperties => ({
-    width: 40, height: 40, borderRadius: 12, background: `${color}22`,
-    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-  });
-
   // Vibe preferences state (persisted to localStorage)
   const [vibes, setVibes] = useState<string[]>(() => normalizeProfileVibes(DEFAULT_VIBES));
   const [vibePickerOpen, setVibePickerOpen] = useState(false);
@@ -129,9 +124,6 @@ export default function ProfilePage() {
 
   // Account toggles
   const manageAccountRef = useRef<HTMLElement>(null);
-  function openManageAccount() {
-    manageAccountRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
   const [notificationsOn, setNotificationsOn] = useState(true);
   const [openToDiscovery, setOpenToDiscovery] = useState(true);
   const [showOnlineStatus, setShowOnlineStatus] = useState(false);
@@ -301,7 +293,6 @@ export default function ProfilePage() {
   }
 
   // Hover states
-  const [settingsCardHover, setSettingsCardHover] = useState<string | null>(null);
   const [vibeTagHover, setVibeTagHover] = useState<string | null>(null);
   const [addMoreHover, setAddMoreHover] = useState(false);
   const [logOutHover, setLogOutHover] = useState(false);
@@ -442,7 +433,7 @@ export default function ProfilePage() {
           >
             <div>
               <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 15, fontWeight: 700, color: textPrimary, letterSpacing: "-0.02em" }}>Giggle+</div>
-              <div style={{ color: textMuted, fontSize: 13, marginTop: 2 }}>Upgrade for premium vibes</div>
+              <div style={{ color: textMuted, fontSize: 13, marginTop: 2 }}>Monthly tokens + 15% pack bonus</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{
@@ -699,64 +690,9 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* Giggle+ Premium row */}
-        <section style={surface}>
-          <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 18, fontWeight: 700, color: textPrimary, marginBottom: 14, letterSpacing: "-0.02em" }}>Giggle+ / Premium</div>
-          <div style={{
-            display: "flex", alignItems: isPhone ? "flex-start" : "center",
-            flexDirection: isPhone ? "column" : "row",
-            justifyContent: "space-between", gap: isPhone ? 12 : 0,
-            padding: isPhone ? "12px 14px" : "14px 18px",
-            background: `linear-gradient(135deg, rgba(124,92,255,0.15), rgba(194,255,61,0.06))`,
-            borderRadius: 14, border: `1px solid var(--violet-soft)`
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, var(--violet), var(--lime))`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Icon.star size={15} color="#0B0B0F" fill="#0B0B0F" />
-              </div>
-              <div>
-                <div style={{ color: textPrimary, fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em" }}>{isPremium ? "Premium Active" : "Unlock Premium"}</div>
-                <div style={{ color: textMuted, fontSize: 13, marginTop: 2 }}>{isPremium ? "Member badge and cosmetic perks active" : "Member badge, premium cosmetics, token perks"}</div>
-              </div>
-            </div>
-            {!isPremium && (
-              <UpgradeButton onClick={() => router.push("/premium")} violet={violet} fullWidth={isPhone} />
-            )}
-          </div>
-        </section>
-
-        {/* Settings grid — 2-col on desktop/tablet, 1-col on phone */}
-        <section style={surface}>
-          <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 18, fontWeight: 700, color: textPrimary, marginBottom: 14, letterSpacing: "-0.02em" }}>Settings</div>
-          <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "1fr 1fr", gap: 12 }}>
-            {[
-              { icon: <Icon.account size={20} color={violet} />, title: "Account Details", desc: "Manage your info" },
-              { icon: <Icon.bell size={20} color={violet} />, title: "Notifications", desc: "Alert preferences" },
-              { icon: <Icon.shield size={20} color={violet} />, title: "Privacy & Safety", desc: "Control who sees you" },
-              { icon: <Icon.settings size={20} color={violet} />, title: "Preferences", desc: "App customization" },
-            ].map(({ icon, title, desc }) => (
-              <SettingsCard
-                key={title}
-                icon={icon}
-                title={title}
-                desc={desc}
-                violet={violet}
-                iconTile={iconTile}
-                textPrimary={textPrimary}
-                textMuted={textMuted}
-                textTertiary={textTertiary}
-                isHovered={settingsCardHover === title}
-                onHover={() => setSettingsCardHover(title)}
-                onLeave={() => setSettingsCardHover(null)}
-                onClick={openManageAccount}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Manage Account */}
+        {/* Account — the real, functional settings (privacy + notifications) */}
         <section ref={manageAccountRef} style={surface}>
-          <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 18, fontWeight: 700, color: textPrimary, marginBottom: 4, letterSpacing: "-0.02em" }}>Manage Account</div>
+          <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 18, fontWeight: 700, color: textPrimary, marginBottom: 4, letterSpacing: "-0.02em" }}>Account</div>
           <SwitchRow
             label="Notifications"
             desc="Receive push notifications for matches and messages"
@@ -804,62 +740,3 @@ export default function ProfilePage() {
   );
 }
 
-// Sub-components extracted to avoid calling hooks conditionally
-
-function UpgradeButton({ onClick, violet, fullWidth }: { onClick: () => void; violet: string; fullWidth?: boolean }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="gg-press"
-      style={{
-        padding: "9px 20px", borderRadius: 999, border: "none", cursor: "pointer", minHeight: 40,
-        background: hovered ? "var(--violet-bright)" : violet,
-        color: "var(--on-accent)", fontFamily: "var(--font-space-grotesk)",
-        fontSize: 13, fontWeight: 700,
-        boxShadow: hovered ? `0 0 24px -4px ${violet}` : `0 0 16px -4px ${violet}`,
-        transform: hovered ? "translateY(-1px)" : "translateY(0)",
-        transition: "transform .14s ease, background .2s var(--ease-ui), box-shadow .2s var(--ease-ui)",
-        width: fullWidth ? "100%" : undefined,
-      }}
-    >
-      Upgrade
-    </button>
-  );
-}
-
-function SettingsCard({
-  icon, title, desc, violet, iconTile, textPrimary, textMuted, textTertiary, isHovered, onHover, onLeave, onClick,
-}: {
-  icon: React.ReactNode; title: string; desc: string; violet: string;
-  iconTile: (c: string) => React.CSSProperties;
-  textPrimary: string; textMuted: string; textTertiary: string;
-  isHovered: boolean; onHover: () => void; onLeave: () => void; onClick?: () => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      onMouseEnter={onHover}
-      onMouseLeave={onLeave}
-      className="gg-press-card"
-      style={{
-        background: isHovered ? "var(--overlay-hover)" : "var(--overlay)",
-        border: isHovered ? "1px solid var(--border-strong)" : "1px solid var(--hairline)",
-        borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center",
-        gap: 14, cursor: "pointer",
-        transition: "transform .18s var(--ease-ui), background .2s var(--ease-ui), border-color .2s var(--ease-ui), box-shadow .2s var(--ease-ui)",
-        transform: isHovered ? "translateY(-2px)" : "translateY(0)",
-        boxShadow: isHovered ? "0 8px 22px rgba(0,0,0,0.2)" : "none",
-      }}
-    >
-      <div style={iconTile(violet)}>{icon}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: textPrimary, fontSize: 15, fontWeight: 600, fontFamily: "var(--font-space-grotesk)", letterSpacing: "-0.02em" }}>{title}</div>
-        <div style={{ color: textMuted, fontSize: 13, marginTop: 2 }}>{desc}</div>
-      </div>
-      <Icon.chevron size={16} color={textTertiary} />
-    </div>
-  );
-}
