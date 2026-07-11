@@ -73,20 +73,17 @@ export function SquadCard({
         boxShadow: hovered ? "0 16px 40px rgba(0,0,0,0.32)" : "var(--elev)",
       }}
     >
-      {/* Cover image (real cover only; gradient lives on the container) */}
+      {/* Cover image (real cover only; gradient lives on the container).
+          Slightly desaturated so a wall of vivid covers doesn't glare. */}
       {hasCover && (
         <div style={{
           position: "absolute", inset: 0,
           background: resolveCover(squad.coverImage),
+          filter: "saturate(0.88) brightness(0.82)",
         }} />
       )}
-      {/* texture + bottom scrim for legibility — identical treatment to VenueCard */}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: "repeating-linear-gradient(115deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 22px)",
-        mixBlendMode: "overlay",
-      }} />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(7,7,11,0.94) 6%, rgba(7,7,11,0.35) 46%, transparent 70%)" }} />
+      {/* bottom scrim for legibility */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(7,7,11,0.95) 12%, rgba(7,7,11,0.5) 50%, rgba(7,7,11,0.1) 78%)" }} />
 
       {/* Status pill (top-left) */}
       <div style={{

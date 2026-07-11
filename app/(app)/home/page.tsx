@@ -312,7 +312,7 @@ export default function HomePage() {
                     onKeyDown={e => { if (e.key === "Enter") handleJoinTrending(sq); }}
                     className="gg-focusable"
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderTop: "1px solid var(--border)", cursor: "pointer" }}>
-                    <span style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: resolveCover(sq.coverImage), boxShadow: "inset 0 0 0 1px var(--border)" }} />
+                    <span style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: resolveCover(sq.coverImage), filter: "saturate(0.8) brightness(0.85)", boxShadow: "inset 0 0 0 1px var(--border)" }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sq.squadName}</div>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 3 }}>
@@ -386,9 +386,10 @@ function SquadTile({
         display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 12,
       }}
     >
-      {/* cover + legibility scrim */}
-      <div style={{ position: "absolute", inset: 0, background: resolveCover(squad.coverImage) }} />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(8,8,11,0.93) 14%, rgba(8,8,11,0.55) 46%, rgba(8,8,11,0.12) 100%)" }} />
+      {/* cover + legibility scrim — the cover reads as a moody, muted backdrop
+          (identity, not glare): desaturated + a strong dark gradient. */}
+      <div style={{ position: "absolute", inset: 0, background: resolveCover(squad.coverImage), filter: "saturate(0.85) brightness(0.75)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(8,8,11,0.97) 24%, rgba(8,8,11,0.82) 58%, rgba(8,8,11,0.55) 100%)" }} />
 
       {/* top row: status + members + theme + leave */}
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -433,7 +434,7 @@ function SquadTile({
             {squad.leaderName ? `Led by ${squad.leaderName}` : (squad.myRole === "leader" ? "You lead this" : "Your squad")}
           </div>
         </div>
-        <button onClick={e => { e.stopPropagation(); onOpen(); }} className="gg-press" style={{ flexShrink: 0, height: 40, padding: "0 18px", borderRadius: 999, border: "none", cursor: "pointer", background: isLive ? "var(--lime)" : "var(--violet)", color: isLive ? "var(--on-accent)" : "#fff", fontFamily: "var(--font-inter)", fontWeight: 700, fontSize: 13.5, boxShadow: isLive ? "0 0 22px -8px rgba(183,255,42,0.6)" : "0 0 18px -8px rgba(118,87,255,0.8)" }}>
+        <button onClick={e => { e.stopPropagation(); onOpen(); }} className="gg-press" style={{ flexShrink: 0, height: 40, padding: "0 18px", borderRadius: 999, border: "none", cursor: "pointer", background: "var(--violet)", color: "#fff", fontFamily: "var(--font-inter)", fontWeight: 700, fontSize: 13.5, boxShadow: "0 0 18px -8px rgba(118,87,255,0.8)" }}>
           {isLive ? "Rejoin" : "Open"}
         </button>
       </div>
