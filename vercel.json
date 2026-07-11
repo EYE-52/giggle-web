@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "env": {
+    "NEXT_PUBLIC_BACKEND_URL": "https://giggle-server-production.up.railway.app"
+  }
+}

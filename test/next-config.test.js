@@ -29,6 +29,7 @@ const topNavSource = () => readFileSync(path.join(__dirname, "../components/TopN
 const privacySource = () => readFileSync(path.join(__dirname, "../app/privacy/page.tsx"), "utf8");
 const termsSource = () => readFileSync(path.join(__dirname, "../app/terms/page.tsx"), "utf8");
 const globalStylesSource = () => readFileSync(path.join(__dirname, "../app/globals.css"), "utf8");
+const vercelConfig = () => JSON.parse(readFileSync(path.join(__dirname, "../vercel.json"), "utf8"));
 
 test("auth proxy never falls back to a production backend", () => {
   const config = source();
@@ -42,6 +43,14 @@ test("auth proxy local fallback is development-only", () => {
   assert.equal(config.includes('"http://localhost:3001"'), true);
   assert.equal(config.includes('process.env.NODE_ENV === "production"'), true);
   assert.equal(config.includes("NEXT_PUBLIC_BACKEND_URL is required in production"), true);
+});
+
+test("Vercel explicitly configures the public backend without an app fallback", () => {
+  assert.equal(
+    vercelConfig().env.NEXT_PUBLIC_BACKEND_URL,
+    "https://giggle-server-production.up.railway.app",
+  );
+  assert.equal(source().includes("giggle-server-production.up.railway.app"), false);
 });
 
 test("frontend workspace pins a supported Node runtime", () => {
