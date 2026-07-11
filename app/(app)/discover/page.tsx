@@ -273,7 +273,7 @@ export default function DiscoverPage() {
           icon={<Icon.discover size={20} color="var(--text-dim)" />}
           title={vibe ? `No open “${vibe}” squads right now` : "No open squads right now"}
           body={vibe ? "Start one with this vibe, or clear the filter to browse other live signals." : "Start the first open room and make your squad discoverable."}
-          primary={{ label: creating ? "Creating…" : (vibe ? `Create a ${vibe} squad` : "Create a squad"), onClick: handleCreate }}
+          primary={{ label: creating ? "Creating…" : (vibe ? `Create a ${vibe} squad` : "Create a squad"), onClick: handleCreate, disabled: creating }}
           secondary={vibe ? { label: "Clear filter", onClick: () => { setVibe(null); try { window.history.replaceState(null, "", "/discover"); } catch {} } } : undefined}
         />
       )}

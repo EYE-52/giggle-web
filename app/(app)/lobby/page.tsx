@@ -949,10 +949,10 @@ function LobbyInner() {
           display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
           transition: "color .15s ease",
         }}
-        title="Get matched faster with Giggle+"
+        title="Giggle+ — monthly tokens and cosmetic perks"
       >
         <Icon.star size={12} color={boostHovered ? "var(--lime-text)" : "var(--text-dim)"} />
-        Want faster matches? Boost with Giggle+
+        Unlock covers &amp; perks with Giggle+
       </button>
     </div>
   );

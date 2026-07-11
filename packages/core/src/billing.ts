@@ -246,21 +246,20 @@ function _grantEntitlement(productId: string): void {
 
   if (product.type === "subscription") {
     e.premium = true;
-    if (productId === "premium_yearly") {
-      e.premiumUntil = Date.now() + 365 * 24 * 60 * 60 * 1000;
-    } else {
-      e.premiumUntil = Date.now() + 30 * 24 * 60 * 60 * 1000;
-    }
+    e.premiumUntil = Date.now() + (productId === "premium_yearly" ? 365 : 30) * 24 * 60 * 60 * 1000;
     safeWrite(e);
-    // Monthly stipend on subscribe.
+    // Monthly stipend on subscribe. addTokens() already notifies listeners; if
+    // there's no stipend, notify once for the premium-flag change.
     if (product.tokens) addTokens(product.tokens);
-    _notify(safeRead());
+    else _notify(e);
     return;
   }
 
-  // token_pack: base + promotional bonus + Giggle+ member bonus.
+  // token_pack: base + promotional bonus + member bonus (only while Giggle+ is
+  // actually active — expired premium in storage must not still earn the bonus).
+  const premiumActive = e.premium && (!e.premiumUntil || e.premiumUntil > Date.now());
   const base = (product.tokens ?? 0) + (product.bonusTokens ?? 0);
-  const memberBonus = e.premium ? Math.floor((product.tokens ?? 0) * PREMIUM_PACK_BONUS_RATE) : 0;
+  const memberBonus = premiumActive ? Math.floor((product.tokens ?? 0) * PREMIUM_PACK_BONUS_RATE) : 0;
   addTokens(base + memberBonus);
 }
 

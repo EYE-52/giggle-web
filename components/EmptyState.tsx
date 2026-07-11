@@ -18,8 +18,8 @@ export function EmptyState({
   icon?: React.ReactNode;
   title: string;
   body?: string;
-  primary?: { label: string; onClick: () => void };
-  secondary?: { label: string; onClick: () => void };
+  primary?: { label: string; onClick: () => void; disabled?: boolean };
+  secondary?: { label: string; onClick: () => void; disabled?: boolean };
   /** When true, renders as a single tight row (for rails/panels). */
   compact?: boolean;
 }) {
@@ -77,6 +77,7 @@ export function EmptyState({
           {secondary && (
             <button
               onClick={secondary.onClick}
+              disabled={secondary.disabled}
               className="gg-press"
               style={{
                 height: 40,
@@ -87,7 +88,8 @@ export function EmptyState({
                 color: "var(--text)",
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: secondary.disabled ? "default" : "pointer",
+                opacity: secondary.disabled ? 0.6 : 1,
               }}
             >
               {secondary.label}
@@ -96,6 +98,7 @@ export function EmptyState({
           {primary && (
             <button
               onClick={primary.onClick}
+              disabled={primary.disabled}
               className="gg-press"
               style={{
                 height: 40,
@@ -106,7 +109,8 @@ export function EmptyState({
                 color: "#fff",
                 fontSize: 13,
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: primary.disabled ? "default" : "pointer",
+                opacity: primary.disabled ? 0.7 : 1,
                 boxShadow: "0 0 20px -8px rgba(118,87,255,0.8)",
               }}
             >
