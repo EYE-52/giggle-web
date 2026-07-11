@@ -51,6 +51,8 @@ test("Vercel explicitly configures the public backend without an app fallback", 
     "https://giggle-server-production.up.railway.app",
   );
   assert.equal(source().includes("giggle-server-production.up.railway.app"), false);
+  assert.equal(vercelConfig().buildCommand, "pnpm build");
+  assert.equal(vercelConfig().outputDirectory, ".next");
 });
 
 test("frontend workspace pins a supported Node runtime", () => {
@@ -59,6 +61,12 @@ test("frontend workspace pins a supported Node runtime", () => {
 
   assert.equal(packageJson.engines.node, ">=20.18 <25");
   assert.match(nodeVersion, /^22\./);
+});
+
+test("Next traces workspace packages from this repository root", () => {
+  const config = source();
+  assert.equal(config.includes('path.resolve(__dirname, "../..")'), false);
+  assert.equal((config.match(/path\.resolve\(__dirname\)/g) ?? []).length, 2);
 });
 
 test("desktop app sets baseline browser security headers", () => {

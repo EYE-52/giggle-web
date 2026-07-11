@@ -45,11 +45,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@giggle/core", "@giggle/ui-tokens", "@giggle/agora"],
-  // Monorepo: pin the workspace root so Turbopack/Next file-tracing resolves
-  // workspace packages correctly instead of mis-inferring the root.
-  outputFileTracingRoot: path.resolve(__dirname, "../.."),
+  // Workspace packages live inside this repository root.
+  outputFileTracingRoot: path.resolve(__dirname),
   turbopack: {
-    root: path.resolve(__dirname, "../.."),
+    root: path.resolve(__dirname),
   },
   async rewrites() {
     return [
