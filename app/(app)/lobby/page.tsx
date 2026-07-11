@@ -936,24 +936,23 @@ function LobbyInner() {
         Invite people
       </button>
 
-      {/* Boost Squad */}
+      {/* Boost — demoted to a subtle upsell. The lobby's job is to gather the
+          squad and start matching; monetization shouldn't compete with that. */}
       <button
         onClick={() => router.push("/premium")}
         onMouseEnter={() => setBoostHovered(true)}
         onMouseLeave={() => setBoostHovered(false)}
         style={{
-          minHeight: 44, padding: "0 14px", borderRadius: 12, border: "none", cursor: "pointer",
-          background: "linear-gradient(135deg, var(--violet), var(--lime))",
-          color: "#0B0B0F",
-          fontFamily: "var(--font-space-grotesk)", fontSize: 12, fontWeight: 800,
+          minHeight: 36, padding: "0 6px", border: "none", cursor: "pointer", background: "none",
+          color: boostHovered ? "var(--text)" : "var(--text-dim)",
+          fontSize: 12, fontWeight: 600,
           display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-          boxShadow: boostHovered ? "0 0 24px -4px var(--violet)" : "0 0 12px -6px var(--violet)",
-          filter: boostHovered ? "brightness(1.12)" : "none",
-          transition: "all .15s ease",
+          transition: "color .15s ease",
         }}
-        title="Get matched 3x faster"
+        title="Get matched faster with Giggle+"
       >
-        ✦ Boost Squad
+        <Icon.star size={12} color={boostHovered ? "var(--lime-text)" : "var(--text-dim)"} />
+        Want faster matches? Boost with Giggle+
       </button>
     </div>
   );
