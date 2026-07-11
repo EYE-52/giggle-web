@@ -441,7 +441,10 @@ export default function LandingPage() {
         </header>
 
         {/* ===================== HERO — cinematic encounter ===================== */}
-        <section style={{ position: "relative", padding: `${isPhone ? 44 : 72}px ${pad}px ${isPhone ? 56 : 100}px` }}>
+        <section
+          data-testid="giggle-hero"
+          style={{ position: "relative", padding: `${isPhone ? 44 : 72}px ${pad}px ${isPhone ? 56 : 100}px` }}
+        >
           <div style={{ width: "100%", maxWidth: maxW, margin: "0 auto", display: "grid", gridTemplateColumns: isTablet ? "1fr" : "1.02fr 1.05fr", gap: isTablet ? 56 : 72, alignItems: "center" }}>
             <div style={{ position: "relative" }}>
               {/* soft spotlight behind the headline for drama */}

@@ -39,7 +39,7 @@
 - Modify: `app/page.tsx`
 - Modify: `docs/GIGGLE-WEB-CHECKLIST.md`
 
-- [ ] **Step 1: Install the existing ecosystem's browser-test package**
+- [x] **Step 1: Install the existing ecosystem's browser-test package**
 
 Run:
 
@@ -50,7 +50,7 @@ pnpm exec playwright install chromium
 
 Expected: `@playwright/test` appears in `devDependencies`, and Chromium installs successfully.
 
-- [ ] **Step 2: Add browser-test scripts**
+- [x] **Step 2: Add browser-test scripts**
 
 Add to `package.json`:
 
@@ -63,7 +63,7 @@ Add to `package.json`:
 }
 ```
 
-- [ ] **Step 3: Configure the five required viewport projects**
+- [x] **Step 3: Configure the five required viewport projects**
 
 Create `playwright.config.ts`:
 
@@ -80,17 +80,18 @@ const viewports = {
 
 export default defineConfig({
   testDir: "./e2e",
+  workers: 1,
   outputDir: "artifacts/playwright-results",
   snapshotPathTemplate: "artifacts/playwright-snapshots/{testFilePath}/{arg}-{projectName}{ext}",
   use: {
-    baseURL: "http://127.0.0.1:4000",
+    baseURL: "http://localhost:4000",
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     video: "retain-on-failure",
   },
   webServer: {
     command: "pnpm dev",
-    url: "http://127.0.0.1:4000",
+    url: "http://localhost:4000",
     reuseExistingServer: true,
     timeout: 120_000,
   },
@@ -101,7 +102,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 4: Write the first failing landing contract**
+- [x] **Step 4: Write the first failing landing contract**
 
 Create `e2e/landing.spec.ts`:
 
@@ -116,7 +117,7 @@ test("landing exposes the product and one primary start action", async ({ page }
 });
 ```
 
-- [ ] **Step 5: Run the test and confirm RED**
+- [x] **Step 5: Run the test and confirm RED**
 
 Run:
 
@@ -126,7 +127,7 @@ pnpm test:e2e --project=phone e2e/landing.spec.ts
 
 Expected: FAIL because `giggle-hero` does not exist.
 
-- [ ] **Step 6: Mark the existing hero as the stable product surface**
+- [x] **Step 6: Mark the existing hero as the stable product surface**
 
 In `app/page.tsx`, add the test id to the existing hero section:
 
@@ -137,7 +138,7 @@ In `app/page.tsx`, add the test id to the existing hero section:
 >
 ```
 
-- [ ] **Step 7: Run the safety rails**
+- [x] **Step 7: Run the safety rails**
 
 Run:
 
@@ -149,7 +150,7 @@ pnpm build
 
 Expected: all commands PASS.
 
-- [ ] **Step 8: Ignore generated evidence, keep curated screenshots**
+- [x] **Step 8: Ignore generated evidence, keep curated screenshots**
 
 Append to `.gitignore`:
 
@@ -158,7 +159,7 @@ artifacts/playwright-results/
 artifacts/playwright-snapshots/
 ```
 
-- [ ] **Step 9: Mark Milestone 0 browser coverage complete and commit**
+- [x] **Step 9: Mark Milestone 0 browser coverage complete and commit**
 
 Update `docs/GIGGLE-WEB-CHECKLIST.md`, then run:
 

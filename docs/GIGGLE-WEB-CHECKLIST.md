@@ -16,11 +16,23 @@ Design source of truth: `docs/superpowers/specs/2026-07-12-giggle-web-experience
 - [x] Inventory routes, shared components, assets, workspace packages, and existing tests
 - [x] Persist and commit the product/responsive experience design
 - [ ] Restore a clean generated `next-env.d.ts` state without overwriting user work
-- [ ] Run the existing unit tests and production build
-- [ ] Start the frontend against the configured backend
-- [ ] Capture baseline screenshots at 390x844, 768x1024, 1280x800, 1440x1100, and 1728x1117
-- [ ] Record console errors, failed requests, layout overflow, and blank-media checks
-- [ ] Add Playwright browser coverage and screenshot directories
+- [x] Run the existing unit tests and production build
+- [x] Start the frontend against the configured backend
+- [x] Capture baseline screenshots at 390x844, 768x1024, 1280x800, 1440x1100, and 1728x1117
+- [x] Record console errors, failed requests, and layout overflow
+- [ ] Run automated blank-media pixel checks for landing video
+- [x] Add Playwright browser coverage and screenshot directories
+
+Baseline evidence from 2026-07-12:
+
+- `pnpm test`: 91 passed
+- `pnpm --filter @giggle/core test`: 25 passed
+- `pnpm test:e2e e2e/landing.spec.ts`: 10 passed across five viewport projects
+- `pnpm build`: passed, 19 static routes generated
+- Frontend `http://localhost:4000`: HTTP 200 from this repository
+- Backend `http://localhost:3001/api/stats`: HTTP 200
+- Screenshots: `artifacts/visual-audit/2026-07-12/landing/*-baseline.png`
+- Current shell warning: Node 25.6.1 is outside the repository's supported `>=20.18 <25` range; release verification must use the pinned `.node-version` runtime.
 
 ## Milestone 1: Public Landing
 
