@@ -1,15 +1,14 @@
-# Giggle Desktop
+# Giggle Web
 
 Canonical production web app for Giggle.
 
-Deploy from the `giggle-app/` workspace root with Vercel root directory `apps/desktop`. The Vercel project may still be named `giggle-web`, but the deploy source is this app, not the legacy top-level `../../giggle-web` folder.
+Repository: `/Users/divyansh/Projects/giggle-stack/giggle-web`
 
 ## Run
 
-From `giggle-app/`:
-
 ```bash
-pnpm dev:desktop
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
 Open [http://localhost:4000](http://localhost:4000).
@@ -18,11 +17,11 @@ Production builds require `NEXT_PUBLIC_BACKEND_URL`; local development falls bac
 
 ## Checks
 
-From `giggle-app/`:
-
 ```bash
-pnpm --filter @giggle/desktop test
-pnpm --filter @giggle/desktop build
+pnpm test
+pnpm --filter @giggle/core test
+pnpm test:e2e
+NEXT_PUBLIC_BACKEND_URL=https://giggle-server-production.up.railway.app pnpm build
 ```
 
 ## Deploy
@@ -31,4 +30,4 @@ pnpm --filter @giggle/desktop build
 vercel deploy --prod --yes --archive=tgz
 ```
 
-Confirm the Vercel project root directory is `apps/desktop`.
+Deploy from this repository root. The checked-in `vercel.json` supplies the framework, build command, output directory, and public backend URL.

@@ -167,14 +167,24 @@ Product-route evidence from 2026-07-12:
 
 ## Milestone 7: Release Gate
 
-- [ ] Run all unit and Playwright tests
-- [ ] Run a clean production build from the standalone repository
-- [ ] Verify production environment validation and OAuth rewrite behavior
-- [ ] Review browser console errors and failed network requests
-- [ ] Verify no horizontal overflow or overlapping controls at all target viewports
-- [ ] Verify reduced motion and keyboard-only navigation
-- [ ] Document final local URL, commands, screenshots, remaining risks, and deployment steps
+- [x] Run all unit and Playwright tests
+- [x] Run a clean production build from the standalone repository
+- [x] Verify production environment validation and OAuth rewrite behavior
+- [x] Review browser console errors and failed network requests
+- [x] Verify no horizontal overflow or overlapping controls at all target viewports
+- [x] Verify reduced motion and keyboard-only navigation
+- [x] Document final local URL, commands, screenshots, remaining risks, and deployment steps
 - [ ] Mark the active goal complete only after every required gate has evidence
+
+Final release evidence from 2026-07-12:
+
+- Node `22.13.0`: `pnpm install --frozen-lockfile` completed with the lockfile unchanged.
+- `pnpm test`: 94 passed.
+- `pnpm --filter @giggle/core test`: 25 passed.
+- `pnpm test:e2e`: 92 passed, 23 intentionally skipped duplicate viewport checks.
+- Production `pnpm build` with the configured backend URL: passed; 19 routes generated.
+- Browser checks cover console errors, failed requests, overflow, media pixels, phone landscape, reduced motion, keyboard navigation, theme persistence, focus, touch targets, and text contrast.
+- Deployment and residual-risk handoff: `docs/GIGGLE-WEB-HANDOFF.md`.
 
 ## Working Rules
 
