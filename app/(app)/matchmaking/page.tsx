@@ -112,8 +112,7 @@ function MatchmakingInner() {
     setCancelError(null);
     try {
       await api.cancelSearch(squadId);
-    } catch (e) {
-      console.error("cancelSearch failed:", e);
+    } catch {
       setCancelError("Couldn't cancel search. Your squad is still in the queue.");
       setCancelling(false);
       return;

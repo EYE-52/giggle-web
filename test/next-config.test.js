@@ -92,6 +92,13 @@ test("dark violet actions keep readable foreground contrast", () => {
   assert.equal(darkTheme.includes("--on-accent: #0B0B0F"), false);
 });
 
+test("encounter backdrops do not mix background shorthand with image longhands", () => {
+  const page = encounterSource();
+
+  assert.equal(page.includes("background: backdrop"), false);
+  assert.equal(page.includes("backgroundImage: backdrop"), true);
+});
+
 test("calling routes give the full viewport to video", () => {
   const layout = appLayoutSource();
 
@@ -819,6 +826,13 @@ test("desktop discover keeps creation in the filtered empty state", () => {
   assert.equal(page.includes("shown.length === 0"), true);
   assert.equal(page.includes("primary={{ label: creating ? \"Creating…\" : (vibe ? `Create a ${vibe} squad` : \"Create a squad\"), onClick: handleCreate, disabled: creating }}"), true);
   assert.equal(page.includes("right={hasOpenSquads ? ("), true);
+});
+
+test("desktop discover presents load failures without logging handled errors", () => {
+  const page = desktopDiscoverSource();
+
+  assert.equal(page.includes('console.error("discoverSquads failed:", e);'), false);
+  assert.equal(page.includes("setError(true);"), true);
 });
 
 test("desktop protected discover actions do not create dev sessions", () => {

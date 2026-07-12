@@ -56,8 +56,7 @@ export default function DiscoverPage() {
     try {
       const { squads } = await api.discoverSquads();
       setSquads(squads ?? []);
-    } catch (e) {
-      console.error("discoverSquads failed:", e);
+    } catch {
       setError(true);
     } finally {
       setLoading(false);

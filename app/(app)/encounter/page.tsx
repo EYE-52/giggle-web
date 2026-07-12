@@ -77,7 +77,7 @@ function TeamRoomBackdrop({
   return (
     <div aria-hidden style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none", borderRadius: radius, overflow: "hidden" }}>
       {/* cover / gradient — richer presence so the side feels themed */}
-      <div style={{ position: "absolute", inset: 0, background: backdrop, backgroundSize: "cover", backgroundPosition: "center", opacity: presence }} />
+      <div style={{ position: "absolute", inset: 0, backgroundImage: backdrop, backgroundSize: "cover", backgroundPosition: "center", opacity: presence }} />
       {/* smart scrim: keeps center brightest for the theme, darkens top/bottom
           so name chips + tile edges stay readable in any cover */}
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(7,7,11,0.7) 0%, rgba(7,7,11,0.42) 42%, rgba(7,7,11,0.72) 100%)" }} />
@@ -143,7 +143,7 @@ function CoverThumb({
         borderRadius: radius,
         flexShrink: 0,
         display: "inline-block",
-        background: backdrop,
+        backgroundImage: backdrop,
         backgroundSize: "cover",
         backgroundPosition: "center",
         border: `1px solid rgba(${accent.rgb},0.55)`,

@@ -27,6 +27,10 @@ test("matchmaking explains progress and keeps cancellation available", async ({ 
 
 test("failed cancellation stays in queue and becomes retryable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "phone", "One phone check covers the cancel recovery contract");
+  const consoleErrors: string[] = [];
+  page.on("console", message => {
+    if (message.text().includes("cancelSearch failed")) consoleErrors.push(message.text());
+  });
   await enterMatchmaking(page);
   await page.route("**/api/squads/*/search/cancel", route => route.abort("failed"));
 
@@ -35,4 +39,5 @@ test("failed cancellation stays in queue and becomes retryable", async ({ page }
   await expect(page).toHaveURL(/\/matchmaking\?squad=/);
   await expect(page.getByRole("alert").filter({ hasText: /cancel/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /try cancel again/i })).toBeVisible();
+  expect(consoleErrors).toEqual([]);
 });
