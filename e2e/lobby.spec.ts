@@ -7,6 +7,8 @@ test("lobby makes readiness and device state explicit in the first viewport", as
 
   const readiness = page.getByTestId("lobby-readiness");
   await expect(readiness).toBeVisible();
+  await expect(readiness.getByText(/used in this lobby and live encounters/i)).toBeVisible();
+  await readiness.getByRole("button", { name: /enable camera and microphone/i }).click();
   await expect(readiness.getByRole("button", { name: "Mute microphone" })).toHaveAttribute("aria-pressed", "true");
   await expect(readiness.getByRole("button", { name: "Turn off camera" })).toHaveAttribute("aria-pressed", "true");
 
@@ -36,6 +38,7 @@ test("short phones keep the readiness controls above the fold", async ({ page },
 
   const readiness = page.getByTestId("lobby-readiness");
   await expect(readiness).toBeVisible();
+  await expect(readiness.getByRole("button", { name: /enable camera and microphone/i })).toBeVisible();
   await expect.poll(() => readiness.evaluate(node => getComputedStyle(node).opacity)).toBe("1");
   const box = await readiness.boundingBox();
   expect(box && box.y + box.height).toBeLessThanOrEqual(650);

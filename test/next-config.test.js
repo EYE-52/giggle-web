@@ -326,6 +326,14 @@ test("desktop lobby requires explicit readiness before starting a match", () => 
   assert.equal(page.includes("await api.setLobbyVideo(squadId, true);\n      await api.startSearch(squadId);"), true);
 });
 
+test("lobby asks before starting camera and microphone", () => {
+  const page = lobbySource();
+
+  assert.equal(page.includes("Used in this lobby and live encounters."), true);
+  assert.equal(page.includes('aria-label="Enable camera and microphone"'), true);
+  assert.equal(page.includes("if (!joinStartedRef.current)"), false);
+});
+
 test("desktop lobby copy actions only show success after clipboard writes succeed", () => {
   const page = lobbySource();
 

@@ -77,7 +77,7 @@ Authentication evidence from 2026-07-12:
 ## Milestone 3: Lobby
 
 - [x] Put squad, readiness, device state, and the next action in the first viewport
-- [ ] Explain camera/microphone intent before browser permission prompts
+- [x] Explain camera/microphone intent before browser permission prompts
 - [x] Keep invite, vibe, visibility, cover, and join-policy controls secondary
 - [x] Make leader/member permissions and ready state unambiguous
 - [ ] Preserve squad state through media errors and recoverable API failures
@@ -86,6 +86,8 @@ Authentication evidence from 2026-07-12:
 
 Lobby evidence from 2026-07-12:
 
+- Camera and microphone startup now follows an explicit, retryable user action that explains media is used in the lobby and live encounters.
+- Declining or failing media access leaves the squad, readiness, matchmaking, and chat surfaces intact.
 - Matchmaking remains disabled with “Waiting for everyone” until all current members are ready.
 - Starting matchmaking no longer silently changes the leader's ready state.
 - Microphone and camera controls expose state through accessible names and `aria-pressed`.

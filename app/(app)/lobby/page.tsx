@@ -219,8 +219,8 @@ function LobbyInner() {
 
   const vcRef = useRef<ReturnType<typeof createVideoClient> | null>(null);
   const localVideoRef = useRef<HTMLDivElement>(null);
-  const joinStartedRef = useRef(false);
   const [videoJoined, setVideoJoined] = useState(false);
+  const [videoJoining, setVideoJoining] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
 
   // Hover states
@@ -268,29 +268,32 @@ function LobbyInner() {
     }
   }
 
+  async function enableLobbyMedia() {
+    if (!squadId || videoJoined || videoJoining) return;
+    setVideoJoining(true);
+    setVideoError(null);
+    try {
+      const tokenData = await api.lobbyToken(squadId);
+      const vc = createVideoClient();
+      vcRef.current = vc;
+      await vc.join(tokenData, { audio: true, video: true });
+      await api.setLobbyVideo(squadId, true);
+      setVideoJoined(true);
+    } catch (e) {
+      await vcRef.current?.leave().catch(() => {});
+      vcRef.current = null;
+      setVideoError(describeVideoError(e));
+    } finally {
+      setVideoJoining(false);
+    }
+  }
+
   useEffect(() => {
     if (!squadId) { setLoading(false); return; }
     fetchSquad();
 
     const socket = connectSocket(squadId);
     socket.on(SOCKET_EVENTS.SQUAD_UPDATED, fetchSquad);
-
-    if (!joinStartedRef.current) {
-      joinStartedRef.current = true;
-      (async () => {
-        try {
-          await api.setLobbyVideo(squadId, true);
-          const tokenData = await api.lobbyToken(squadId);
-          const vc = createVideoClient();
-          vcRef.current = vc;
-          await vc.join(tokenData, { audio: true, video: true });
-          setVideoJoined(true);
-        } catch (e) {
-          console.error("Lobby video join failed (non-fatal):", e);
-          setVideoError(describeVideoError(e));
-        }
-      })();
-    }
 
     return () => {
       socket.off(SOCKET_EVENTS.SQUAD_UPDATED, fetchSquad);
@@ -1625,50 +1628,68 @@ function LobbyInner() {
               maxWidth: isPhone ? "calc(100vw - 20px)" : undefined,
               zIndex: 1,
             }}>
-              {/* Mic */}
-              <button
-                onClick={toggleMic}
-                onMouseEnter={() => setMicHovered(true)}
-                onMouseLeave={() => setMicHovered(false)}
-                title={micOn ? "Mute microphone" : "Unmute microphone"}
-                aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
-                aria-pressed={micOn}
-                style={{
-                  width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: micOn
-                    ? (micHovered ? "rgba(124,92,255,0.35)" : "rgba(124,92,255,0.2)")
-                    : (micHovered ? "rgba(255,92,92,0.35)" : "rgba(255,92,92,0.25)"),
-                  transition: "all .15s ease",
-                  transform: micHovered ? "scale(1.08)" : "scale(1)",
-                }}
-              >
-                <Icon.mic size={20} color={micOn ? "#7C5CFF" : "#FF5C5C"} />
-              </button>
-
-              {/* Cam */}
-              <button
-                onClick={toggleCam}
-                onMouseEnter={() => setCamHovered(true)}
-                onMouseLeave={() => setCamHovered(false)}
-                title={camOn ? "Turn off camera" : "Turn on camera"}
-                aria-label={camOn ? "Turn off camera" : "Turn on camera"}
-                aria-pressed={camOn}
-                style={{
-                  width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: camOn
-                    ? (camHovered ? "rgba(124,92,255,0.35)" : "rgba(124,92,255,0.2)")
-                    : (camHovered ? "rgba(255,92,92,0.35)" : "rgba(255,92,92,0.25)"),
-                  transition: "all .15s ease",
-                  transform: camHovered ? "scale(1.08)" : "scale(1)",
-                }}
-              >
-                <Icon.cam size={20} color={camOn ? "#7C5CFF" : "#FF5C5C"} />
-              </button>
-
-              {/* Divider */}
-              <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.1)", margin: "0 2px" }} />
+              {videoJoined ? (
+                <>
+                  <button
+                    onClick={toggleMic}
+                    onMouseEnter={() => setMicHovered(true)}
+                    onMouseLeave={() => setMicHovered(false)}
+                    title={micOn ? "Mute microphone" : "Unmute microphone"}
+                    aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
+                    aria-pressed={micOn}
+                    style={{
+                      width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      background: micOn
+                        ? (micHovered ? "rgba(124,92,255,0.35)" : "rgba(124,92,255,0.2)")
+                        : (micHovered ? "rgba(255,92,92,0.35)" : "rgba(255,92,92,0.25)"),
+                      transition: "all .15s ease",
+                      transform: micHovered ? "scale(1.08)" : "scale(1)",
+                    }}
+                  >
+                    <Icon.mic size={20} color={micOn ? "#7C5CFF" : "#FF5C5C"} />
+                  </button>
+                  <button
+                    onClick={toggleCam}
+                    onMouseEnter={() => setCamHovered(true)}
+                    onMouseLeave={() => setCamHovered(false)}
+                    title={camOn ? "Turn off camera" : "Turn on camera"}
+                    aria-label={camOn ? "Turn off camera" : "Turn on camera"}
+                    aria-pressed={camOn}
+                    style={{
+                      width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      background: camOn
+                        ? (camHovered ? "rgba(124,92,255,0.35)" : "rgba(124,92,255,0.2)")
+                        : (camHovered ? "rgba(255,92,92,0.35)" : "rgba(255,92,92,0.25)"),
+                      transition: "all .15s ease",
+                      transform: camHovered ? "scale(1.08)" : "scale(1)",
+                    }}
+                  >
+                    <Icon.cam size={20} color={camOn ? "#7C5CFF" : "#FF5C5C"} />
+                  </button>
+                  <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.1)", margin: "0 2px" }} />
+                </>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flex: isPhone ? "1 0 100%" : undefined }}>
+                  <span style={{ maxWidth: 150, color: textMuted, fontSize: 11.5, lineHeight: 1.25 }}>
+                    Used in this lobby and live encounters.
+                  </span>
+                  <button
+                    onClick={enableLobbyMedia}
+                    disabled={videoJoining}
+                    aria-label="Enable camera and microphone"
+                    style={{
+                      minHeight: 44, borderRadius: 999, border: "1px solid rgba(124,92,255,0.45)", padding: "0 14px",
+                      display: "inline-flex", alignItems: "center", gap: 7, cursor: videoJoining ? "wait" : "pointer",
+                      background: "rgba(124,92,255,0.18)", color: "#F4F4F7", fontWeight: 700, whiteSpace: "nowrap",
+                    }}
+                  >
+                    <Icon.cam size={17} color="#9278FF" />
+                    {videoJoining ? "Enabling..." : "Enable camera & mic"}
+                  </button>
+                </div>
+              )}
 
               {/* Ready toggle */}
               <button
