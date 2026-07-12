@@ -305,12 +305,15 @@ test("desktop lobby ready toggle surfaces backend failures", () => {
   assert.equal(page.includes('console.error("setReady failed:", e);'), false);
 });
 
-test("desktop lobby find match does not hide readiness or video sync failures", () => {
+test("desktop lobby requires explicit readiness before starting a match", () => {
   const page = lobbySource();
 
   assert.equal(page.includes("try { await api.setReady(squadId, true); } catch {}"), false);
   assert.equal(page.includes("try { await api.setLobbyVideo(squadId, true); } catch {}"), false);
-  assert.equal(page.includes("await api.setReady(squadId, true);\n      await api.setLobbyVideo(squadId, true);\n      await api.startSearch(squadId);"), true);
+  assert.equal(page.includes("const everyoneReady = !!squad?.members.length && squad.members.every(member => member.ready);"), true);
+  assert.equal(page.includes("Everyone needs to be ready before you find a match."), true);
+  assert.equal(page.includes("await api.setReady(squadId, true);\n      await api.setLobbyVideo"), false);
+  assert.equal(page.includes("await api.setLobbyVideo(squadId, true);\n      await api.startSearch(squadId);"), true);
 });
 
 test("desktop lobby copy actions only show success after clipboard writes succeed", () => {

@@ -505,10 +505,14 @@ function LobbyInner() {
 
   async function handleFindMatch() {
     if (!squadId) return;
+    const everyoneReady = !!squad?.members.length && squad.members.every(member => member.ready);
+    if (!everyoneReady) {
+      setMatchError("Everyone needs to be ready before you find a match.");
+      return;
+    }
     setFindingMatch(true);
     setMatchError(null);
     try {
-      await api.setReady(squadId, true);
       await api.setLobbyVideo(squadId, true);
       await api.startSearch(squadId);
       router.push(`/matchmaking?squad=${squadId}`);
@@ -1601,7 +1605,7 @@ function LobbyInner() {
             </div>
 
             {/* ── CONTROL BAR (centered floating pill) ── */}
-            <div style={{
+            <div data-testid="lobby-readiness" style={{
               display: "flex", alignItems: "center", justifyContent: "center" as const, gap: 10,
               background: "rgba(22,22,30,0.92)",
               backdropFilter: "blur(16px)",
@@ -1626,7 +1630,9 @@ function LobbyInner() {
                 onClick={toggleMic}
                 onMouseEnter={() => setMicHovered(true)}
                 onMouseLeave={() => setMicHovered(false)}
-                title={micOn ? "Mute mic" : "Unmute mic"}
+                title={micOn ? "Mute microphone" : "Unmute microphone"}
+                aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
+                aria-pressed={micOn}
                 style={{
                   width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -1646,6 +1652,8 @@ function LobbyInner() {
                 onMouseEnter={() => setCamHovered(true)}
                 onMouseLeave={() => setCamHovered(false)}
                 title={camOn ? "Turn off camera" : "Turn on camera"}
+                aria-label={camOn ? "Turn off camera" : "Turn on camera"}
+                aria-pressed={camOn}
                 style={{
                   width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -1691,11 +1699,12 @@ function LobbyInner() {
                   {!isPhone && <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.1)", margin: "0 2px" }} />}
                   <button
                     onClick={handleFindMatch}
-                    disabled={findingMatch}
+                    disabled={findingMatch || !allReady}
+                    aria-label="Find a Match"
                     onMouseEnter={() => setFindMatchHovered(true)}
                     onMouseLeave={() => setFindMatchHovered(false)}
                     style={{
-                      height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: findingMatch ? "not-allowed" : "pointer",
+                      height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: findingMatch || !allReady ? "not-allowed" : "pointer",
                       padding: "0 28px",
                       display: "flex", alignItems: "center", gap: 8,
                       background: "var(--violet)",
@@ -1709,10 +1718,11 @@ function LobbyInner() {
                       minWidth: isPhone ? 0 : 162,
                       flex: isPhone ? "1 0 100%" : undefined,
                       whiteSpace: "nowrap" as const,
+                      opacity: allReady ? 1 : 0.56,
                     }}
                   >
                     <Icon.discover size={18} color="#fff" />
-                    {findingMatch ? "Starting…" : "Find a Match"}
+                    {findingMatch ? "Starting…" : allReady ? "Find a Match" : "Waiting for everyone"}
                   </button>
                 </>
               )}

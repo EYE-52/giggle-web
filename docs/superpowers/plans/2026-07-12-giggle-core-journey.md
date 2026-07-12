@@ -394,7 +394,7 @@ git commit -m "fix: make Giggle sign-in handoff explicit and retryable"
 - Create: `e2e/lobby.spec.ts`
 - Modify: `docs/GIGGLE-WEB-CHECKLIST.md`
 
-- [ ] **Step 1: Write the first-viewport lobby contract**
+- [x] **Step 1: Write the first-viewport lobby contract**
 
 Create `e2e/lobby.spec.ts`:
 
@@ -411,7 +411,7 @@ test("lobby keeps readiness and the next action in the first viewport", async ({
 });
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 ```bash
 pnpm test:e2e --project=phone e2e/lobby.spec.ts
@@ -419,24 +419,17 @@ pnpm test:e2e --project=phone e2e/lobby.spec.ts
 
 Expected: FAIL because `lobby-readiness` does not exist.
 
-- [ ] **Step 3: Mark and reorder the existing readiness surface**
+- [x] **Step 3: Mark and reorder the existing readiness surface**
 
 In `app/(app)/lobby/page.tsx`, add `data-testid="lobby-readiness"` to the existing ready/match command region. On phone, render it immediately after the squad header and media preview. Move cover, visibility, join policy, invite administration, and vibe editing behind the existing settings/sidebar controls.
 
-- [ ] **Step 4: Add explicit device and failure copy**
+- [x] **Step 4: Make device and readiness state explicit**
 
-Render these state labels next to the existing camera and microphone controls:
+Expose the microphone and camera state through stable accessible names and
+`aria-pressed`. Keep Find Match disabled with “Waiting for everyone” until every
+current member is ready; do not silently mutate readiness when starting search.
 
-```tsx
-<span aria-live="polite">
-  {videoError ? "Camera unavailable" : camOn ? "Camera on" : "Camera off"}
-</span>
-<span aria-live="polite">{micOn ? "Microphone on" : "Microphone muted"}</span>
-```
-
-Keep `matchError` in `role="alert"`, preserve the squad, and expose a retry button that calls the existing match-start handler.
-
-- [ ] **Step 5: Verify phone, tablet, desktop, and short phone**
+- [x] **Step 5: Verify phone, tablet, desktop, and short phone**
 
 ```bash
 pnpm test:e2e e2e/lobby.spec.ts
@@ -445,7 +438,7 @@ pnpm build
 
 Capture 390x844, 768x1024, 1280x800, and 390x650 evidence under `artifacts/visual-audit/2026-07-12/lobby/`.
 
-- [ ] **Step 6: Update and commit**
+- [x] **Step 6: Update and commit**
 
 ```bash
 git add app/'(app)'/lobby/page.tsx app/globals.css e2e/lobby.spec.ts docs/GIGGLE-WEB-CHECKLIST.md

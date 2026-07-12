@@ -76,13 +76,22 @@ Authentication evidence from 2026-07-12:
 
 ## Milestone 3: Lobby
 
-- [ ] Put squad, readiness, device state, and the next action in the first viewport
+- [x] Put squad, readiness, device state, and the next action in the first viewport
 - [ ] Explain camera/microphone intent before browser permission prompts
-- [ ] Keep invite, vibe, visibility, cover, and join-policy controls secondary
-- [ ] Make leader/member permissions and ready state unambiguous
+- [x] Keep invite, vibe, visibility, cover, and join-policy controls secondary
+- [x] Make leader/member permissions and ready state unambiguous
 - [ ] Preserve squad state through media errors and recoverable API failures
 - [ ] Verify loading, missing squad, permission denied, disconnected, and retry states
-- [ ] Capture phone, tablet, desktop, and short-phone evidence
+- [x] Capture phone, tablet, desktop, and short-phone evidence
+
+Lobby evidence from 2026-07-12:
+
+- Matchmaking remains disabled with “Waiting for everyone” until all current members are ready.
+- Starting matchmaking no longer silently changes the leader's ready state.
+- Microphone and camera controls expose state through accessible names and `aria-pressed`.
+- Readiness remains in the first viewport at 390x650, 390x844, tablet, laptop, desktop, and wide desktop sizes.
+- `pnpm test:e2e e2e/lobby.spec.ts`: 5 standard viewport checks passed; short-phone check passed separately.
+- Screenshots: `artifacts/visual-audit/2026-07-12/lobby/`.
 
 ## Milestone 4: Matchmaking and Match Confirmation
 
