@@ -134,8 +134,8 @@ Encounter evidence from 2026-07-12:
 ## Milestone 6: Shared Product Experience
 
 - [x] Curate authenticated navigation separately for phone, tablet, and desktop
-- [ ] Apply the visual system to Home, Discover, Friends, Profile, and Premium
-- [ ] Remove card/pill clutter and keep one primary action per state
+- [x] Apply the visual system to Home, Discover, Friends, Profile, and Premium
+- [x] Remove card/pill clutter and keep one primary action per state
 - [ ] Standardize loading, empty, failure, offline, and success feedback
 - [ ] Verify theme behavior, focus rings, touch targets, and text contrast
 
@@ -146,6 +146,15 @@ Navigation evidence from 2026-07-12:
 - Active destinations expose `aria-current="page"`, and phone content reserves space for the fixed bar.
 - `pnpm test:e2e e2e/navigation.spec.ts`: 5 passed.
 - Screenshots: `artifacts/visual-audit/2026-07-12/navigation/`.
+
+Product-route evidence from 2026-07-12:
+
+- Home, Discover, Friends, Profile, and Wallet each expose a clear first task without horizontal overflow, console errors, or failed requests.
+- Phone layouts keep primary actions and empty-state guidance above the fixed navigation; larger layouts constrain content instead of stretching cards across the viewport.
+- Profile keeps chips only for direct multi-select preferences and identity choices; the remaining routes avoid decorative pill and card repetition.
+- Wallet remains informational while payments are deferred and exposes no misleading buy, subscribe, or checkout action.
+- `pnpm test:e2e e2e/product-routes.spec.ts`: 25 passed across five viewport projects.
+- Screenshots: `artifacts/visual-audit/2026-07-12/product-routes/`.
 
 ## Milestone 7: Release Gate
 
