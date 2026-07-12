@@ -58,12 +58,21 @@ Story evidence from 2026-07-12:
 
 ## Milestone 2: Sign-In and Session Handoff
 
-- [ ] Keep one dominant OAuth action and concise data-use context
-- [ ] Verify referral-code preservation and safe callback routing
-- [ ] Add explicit loading, provider failure, backend failure, and retry states
-- [ ] Verify local dev sign-in without exposing a production bypass
-- [ ] Confirm authenticated users continue to the intended route
-- [ ] Capture phone, tablet, and desktop evidence
+- [x] Keep one dominant OAuth action and concise data-use context
+- [x] Verify referral-code preservation and safe callback routing
+- [x] Add explicit loading, provider failure, backend failure, and retry states
+- [x] Verify local dev sign-in without exposing a production bypass
+- [x] Confirm authenticated users continue to the intended route
+- [x] Capture phone, tablet, and desktop evidence
+
+Authentication evidence from 2026-07-12:
+
+- Google OAuth remains configured and is the dominant provider action; Apple remains secondary.
+- A same-origin OAuth preflight keeps backend/provider-start failures retryable on the sign-in screen.
+- Safe continuations are stored per tab through the redirect and validated again in the callback.
+- Dev sign-in reaches the requested local route; protocol-relative/external continuations fall back to `/home`.
+- `pnpm test:e2e e2e/signin.spec.ts`: 25 passed across five viewport projects.
+- Screenshots: `artifacts/visual-audit/2026-07-12/signin/`.
 
 ## Milestone 3: Lobby
 

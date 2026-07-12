@@ -7,17 +7,31 @@ import { Icon } from "@/components/Icons";
 import { session, setPendingReferral, BACKEND_URL } from "@giggle/core";
 import { useViewport } from "@/components/useViewport";
 
+type SignInStatus = "idle" | "redirecting" | "dev" | "failed";
+const AUTH_NEXT_KEY = "giggle.auth.next";
+
+function safeNextPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/home";
+  return value;
+}
+
 export default function AuthPage() {
   const router = useRouter();
   const { isPhone } = useViewport();
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<SignInStatus>("idle");
+  const [activeProvider, setActiveProvider] = useState<"google" | "apple" | null>(null);
   const [err, setErr] = useState("");
   const [refCode, setRefCode] = useState<string | null>(null);
+  const [nextPath, setNextPath] = useState("/home");
+  const busy = status === "redirecting" || status === "dev";
 
   // Capture an inbound invite code (?ref=CODE) and remember it through signup.
   useEffect(() => {
     try {
       const code = new URLSearchParams(window.location.search).get("ref");
+      const continuation = safeNextPath(new URLSearchParams(window.location.search).get("next"));
+      setNextPath(continuation);
+      sessionStorage.setItem(AUTH_NEXT_KEY, continuation);
       if (code) {
         const clean = code.trim().toUpperCase();
         setPendingReferral(clean);
@@ -30,26 +44,47 @@ export default function AuthPage() {
   // email), so two windows are two different users — required for 2-squad testing.
   // session.devSignIn() still consumes any captured ?ref via the shared sign-in path.
   const devFinish = useCallback(async () => {
-    setLoading(true); setErr("");
+    setStatus("dev"); setErr("");
     try {
       await session.devSignIn();
-      router.push("/home");
-    } catch (e: any) {
-      setErr(e?.message || "Sign in failed. Try again.");
-      setLoading(false);
+      router.push(nextPath);
+    } catch (error: unknown) {
+      setErr(error instanceof Error ? error.message : "Sign in failed. Try again.");
+      setStatus("failed");
     }
-  }, [router]);
+  }, [nextPath, router]);
 
   // Real OAuth: full-page redirect to the Express backend, which redirects to
   // Google consent and then back to /auth/callback#token=<jwt>.
-  const oauthRedirect = (provider: "google" | "apple") => {
+  const oauthRedirect = async (provider: "google" | "apple") => {
     setErr("");
+    setStatus("redirecting");
+    setActiveProvider(provider);
     const ref = refCode ? `?ref=${encodeURIComponent(refCode)}` : "";
     // Same-origin so the flow goes through this domain's /api/auth proxy →
     // Google's consent screen shows gigglemeet.com (not the backend host).
     // Falls back to BACKEND_URL during SSR where window is unavailable.
     const base = typeof window !== "undefined" ? window.location.origin : BACKEND_URL;
-    window.location.href = `${base}/api/auth/${provider}${ref}`;
+    const destination = `${base}/api/auth/${provider}${ref}`;
+    try {
+      const response = await fetch(destination, {
+        method: "HEAD",
+        credentials: "same-origin",
+        redirect: "manual",
+        cache: "no-store",
+      });
+      const handoffReady = response.ok
+        || response.type === "opaqueredirect"
+        || (response.status >= 300 && response.status < 400);
+      if (!handoffReady) {
+        throw new Error("AUTH_UNAVAILABLE");
+      }
+      window.location.assign(destination);
+    } catch {
+      setErr(`We couldn't reach ${provider === "google" ? "Google" : "Apple"} sign-in. Check your connection and try again.`);
+      setStatus("failed");
+      setActiveProvider(null);
+    }
   };
 
   return (
@@ -62,7 +97,7 @@ export default function AuthPage() {
           <span style={{ fontFamily: "var(--font-space-grotesk), sans-serif", fontWeight: 700, fontSize: 20 }}>Giggle</span>
         </div>
 
-        <h1 style={{ margin: 0, fontFamily: "var(--font-space-grotesk), sans-serif", fontSize: isPhone ? 32 : 40, fontWeight: 700, lineHeight: 1.02, letterSpacing: 0, maxWidth: 330 }}>Meet people with your people.</h1>
+        <h1 style={{ margin: 0, fontFamily: "var(--font-space-grotesk), sans-serif", fontSize: isPhone ? 32 : 40, fontWeight: 700, lineHeight: 1.02, letterSpacing: 0, maxWidth: 330 }}>Join Giggle with your squad.</h1>
         <p style={{ margin: "12px 0 26px", color: "#aaaabc", fontSize: 15, lineHeight: 1.5 }}>Bring a friend, match with another squad, and go live together.</p>
 
         {refCode && <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 16, padding: "10px 12px", borderRadius: 10, background: "rgba(118,87,255,.14)", color: "#d8d1ff", fontSize: 13 }}><Icon.gift size={17} color="#9278ff" /> Invite accepted. You both get 100 tokens.</div>}
@@ -71,7 +106,7 @@ export default function AuthPage() {
           <button
             className="gg-press"
             onClick={() => oauthRedirect("google")}
-            disabled={loading}
+            disabled={busy}
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 11,
               width: "100%", height: 50, borderRadius: 10,
@@ -80,13 +115,13 @@ export default function AuthPage() {
               cursor: "pointer", whiteSpace: "nowrap",
             }}
           >
-            <Icon.google size={20} /> Continue with Google
+            <Icon.google size={20} /> {status === "redirecting" && activeProvider === "google" ? "Opening Google..." : "Continue with Google"}
           </button>
 
           <button
             className="gg-press"
             onClick={() => oauthRedirect("apple")}
-            disabled={loading}
+            disabled={busy}
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 11,
               width: "100%", height: 50, borderRadius: 10,
@@ -95,18 +130,24 @@ export default function AuthPage() {
               cursor: "pointer", whiteSpace: "nowrap",
             }}
           >
-            <Icon.apple size={19} /> Continue with Apple
+            <Icon.apple size={19} /> {status === "redirecting" && activeProvider === "apple" ? "Opening Apple..." : "Continue with Apple"}
           </button>
         </div>
 
-        {err && <p role="alert" style={{ margin: "12px 0 0", color: "#ff7979", fontSize: 13 }}>{err}</p>}
+        <p style={{ margin: "12px 0 0", color: "#9292a6", fontSize: 12.5, lineHeight: 1.45 }}>We use your name and email to create your profile. We never post on your behalf.</p>
+        {err && (
+          <div style={{ marginTop: 12 }}>
+            <p role="alert" style={{ margin: 0, color: "#ff7979", fontSize: 13, lineHeight: 1.45 }}>{err}</p>
+            <button onClick={() => { setErr(""); setStatus("idle"); }} style={{ minHeight: 44, padding: 0, border: 0, background: "transparent", color: "#d8d1ff", font: "600 13px var(--font-inter), sans-serif", cursor: "pointer" }}>Try again</button>
+          </div>
+        )}
         <p style={{ margin: "18px 0 0", color: "#777789", fontSize: 11.5, lineHeight: 1.5 }}>By continuing, you agree to our <Link href="/terms" style={{ color: "#aaaabc", textDecoration: "underline" }}>Terms</Link> and <Link href="/privacy" style={{ color: "#aaaabc", textDecoration: "underline" }}>Privacy Policy</Link>.</p>
 
         {process.env.NODE_ENV !== "production" && (
           <button
             className="gg-press"
             onClick={devFinish}
-            disabled={loading}
+            disabled={busy}
             style={{
               background: "transparent",
               border: "none",
@@ -119,7 +160,7 @@ export default function AuthPage() {
               marginTop: 8,
             }}
           >
-            Use dev account
+            {status === "dev" ? "Opening dev account..." : "Use dev account"}
           </button>
         )}
       </section>

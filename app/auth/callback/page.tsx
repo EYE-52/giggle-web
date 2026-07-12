@@ -4,6 +4,14 @@ import { useRouter } from "next/navigation";
 import { Logomark } from "@/components/Brand";
 import { session } from "@giggle/core";
 
+const AUTH_NEXT_KEY = "giggle.auth.next";
+
+function safeStoredNext() {
+  const value = sessionStorage.getItem(AUTH_NEXT_KEY);
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/home";
+  return value;
+}
+
 // Landing page for OAuth / magic-link redirects. The backend sends the user
 // here with the JWT in the URL hash (#token=…) or #error=CODE on failure.
 export default function AuthCallbackPage() {
@@ -18,7 +26,9 @@ export default function AuthCallbackPage() {
         session.setTokenFromOAuth(token);
         // Clean the token out of the URL before navigating away.
         window.history.replaceState(null, "", window.location.pathname);
-        router.replace("/home");
+        const nextPath = safeStoredNext();
+        sessionStorage.removeItem(AUTH_NEXT_KEY);
+        router.replace(nextPath);
       } catch {
         if (!cancelled) setError("We couldn't complete sign-in. Please try again.");
       }

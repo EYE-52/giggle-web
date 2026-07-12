@@ -317,7 +317,7 @@ git commit -m "feat: curate Giggle navigation by device class"
 - Create: `e2e/signin.spec.ts`
 - Modify: `docs/GIGGLE-WEB-CHECKLIST.md`
 
-- [ ] **Step 1: Write sign-in state contracts**
+- [x] **Step 1: Write sign-in state contracts**
 
 Create `e2e/signin.spec.ts`:
 
@@ -340,7 +340,7 @@ test("sign-in exposes provider failures as retryable alerts", async ({ page }) =
 });
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 ```bash
 pnpm test:e2e --project=phone e2e/signin.spec.ts
@@ -348,7 +348,7 @@ pnpm test:e2e --project=phone e2e/signin.spec.ts
 
 Expected: at least the failure-state test FAILS.
 
-- [ ] **Step 3: Add a single retryable sign-in state machine**
+- [x] **Step 3: Add a single retryable sign-in state machine**
 
 In `app/signin/page.tsx`, use these explicit states:
 
@@ -360,7 +360,7 @@ const [error, setError] = useState("");
 
 Set `redirecting` before constructing the OAuth URL. Catch URL/configuration failures, set `failed`, and render a `role="alert"` containing the backend-safe message plus a `Try again` button that restores `idle`.
 
-- [ ] **Step 4: Preserve only safe same-site continuation paths**
+- [x] **Step 4: Preserve only safe same-site continuation paths**
 
 Add this helper beside the sign-in component:
 
@@ -371,9 +371,12 @@ function safeNextPath(value: string | null) {
 }
 ```
 
-Pass the encoded path through OAuth state using the existing session/auth mechanism; reject external paths in the callback before `router.replace`.
+Store the validated continuation in per-tab `sessionStorage` before the full-page
+OAuth redirect and validate it again in the callback before `router.replace`.
+This preserves the backend's signed OAuth state contract without adding frontend
+data to it.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 pnpm test:e2e e2e/signin.spec.ts
