@@ -41,8 +41,8 @@ Baseline evidence from 2026-07-12:
 - [x] Use a curated pinned scrub sequence with a shorter phone scroll track
 - [x] Reserve stable dimensions for hero and story media
 - [x] Provide poster/fallback imagery for every active landing video
-- [ ] Verify navigation, CTA, trust copy, privacy links, reduced motion, and keyboard access
-- [ ] Remove visual effects that do not strengthen hierarchy or product understanding
+- [x] Verify navigation, CTA, trust copy, privacy links, reduced motion, and keyboard access
+- [x] Remove visual effects that do not strengthen hierarchy or product understanding
 - [x] Capture phone, tablet, laptop, desktop, wide-desktop, and reduced-motion evidence
 
 Story evidence from 2026-07-12:
@@ -52,7 +52,8 @@ Story evidence from 2026-07-12:
 - Real poster frame added for slow media and reduced-motion users.
 - Browser checks validate the expected title and nonblank decoded video pixels at all three scroll checkpoints.
 - `pnpm test:e2e e2e/landing.spec.ts --grep "cinematic story"`: 6 passed, 4 intentionally skipped viewport duplicates.
-- Complete landing browser gate: 16 passed, 4 intentionally skipped reduced-motion viewport duplicates.
+- Complete landing browser gate: 17 passed, 8 intentionally skipped keyboard/reduced-motion viewport duplicates.
+- Public navigation follows a logical keyboard order with a visible focus ring; Enter hands the primary CTA to sign-in and legal links resolve to Privacy and Terms.
 - `pnpm build`: passed after the story repair; TypeScript clean and all 19 static routes generated.
 - Screenshots: `artifacts/visual-audit/2026-07-12/landing-story/`.
 
@@ -80,14 +81,15 @@ Authentication evidence from 2026-07-12:
 - [x] Explain camera/microphone intent before browser permission prompts
 - [x] Keep invite, vibe, visibility, cover, and join-policy controls secondary
 - [x] Make leader/member permissions and ready state unambiguous
-- [ ] Preserve squad state through media errors and recoverable API failures
-- [ ] Verify loading, missing squad, permission denied, disconnected, and retry states
+- [x] Preserve squad state through media errors and recoverable API failures
+- [x] Verify loading, missing squad, permission denied, disconnected, and retry states
 - [x] Capture phone, tablet, desktop, and short-phone evidence
 
 Lobby evidence from 2026-07-12:
 
 - Camera and microphone startup now follows an explicit, retryable user action that explains media is used in the lobby and live encounters.
 - Declining or failing media access leaves the squad, readiness, matchmaking, and chat surfaces intact.
+- Source-level regression coverage verifies missing-squad recovery, media permission messaging, loading, disconnected-member treatment, API rollback, and retryable errors.
 - Matchmaking remains disabled with “Waiting for everyone” until all current members are ready.
 - Starting matchmaking no longer silently changes the leader's ready state.
 - Microphone and camera controls expose state through accessible names and `aria-pressed`.
@@ -101,7 +103,7 @@ Lobby evidence from 2026-07-12:
 - [x] Keep cancellation visible and safe
 - [x] Preserve the squad when cancellation or polling fails
 - [x] Deduplicate socket and polling match-found events
-- [ ] Verify timeout, retry, cancellation, and match-found handoff
+- [x] Verify timeout, retry, cancellation, and match-found handoff
 - [x] Capture phone, tablet, and desktop evidence
 
 Matchmaking evidence from 2026-07-12:
@@ -109,6 +111,7 @@ Matchmaking evidence from 2026-07-12:
 - Queue status advances through active-squad checking, vibe matching, and strongest-live-match stages.
 - Socket and polling events retain the existing single-reveal guard and timer cleanup.
 - Failed cancellation keeps the squad queued, explains that state, and changes the action to `Try cancel again`.
+- Expiry and delayed handoff timers are cleaned up on unmount; the real two-user encounter test verifies queue-to-match-to-encounter handoff.
 - `pnpm test:e2e e2e/matchmaking.spec.ts`: 6 passed, 4 intentionally skipped duplicate recovery checks.
 - Screenshots: `artifacts/visual-audit/2026-07-12/matchmaking/`.
 
@@ -138,7 +141,7 @@ Encounter evidence from 2026-07-12:
 - [x] Curate authenticated navigation separately for phone, tablet, and desktop
 - [x] Apply the visual system to Home, Discover, Friends, Profile, and Premium
 - [x] Remove card/pill clutter and keep one primary action per state
-- [ ] Standardize loading, empty, failure, offline, and success feedback
+- [x] Standardize loading, empty, failure, offline, and success feedback
 - [x] Verify theme behavior, focus rings, touch targets, and text contrast
 
 Navigation evidence from 2026-07-12:
@@ -160,6 +163,7 @@ Product-route evidence from 2026-07-12:
 - Saved light mode survives reload, keyboard users can reveal and activate the skip link, and focused controls expose a visible ring.
 - Phone shell navigation and utilities retain at least 44x44 CSS-pixel targets; primary body-text tokens clear 4.5:1 contrast in both themes.
 - `pnpm test:e2e e2e/shell-accessibility.spec.ts`: 3 passed, 7 intentionally skipped duplicate viewport checks.
+- Unit contracts cover compact loading skeletons, actionable empty states, inline failure and retry feedback, offline presence, and success only after backend confirmation.
 
 ## Milestone 7: Release Gate
 

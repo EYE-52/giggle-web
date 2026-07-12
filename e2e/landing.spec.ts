@@ -32,6 +32,26 @@ test("landing stays within the viewport without browser failures", async ({ page
   expect(failedRequests).toEqual([]);
 });
 
+test("landing navigation, start action, and legal links work by keyboard", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "One desktop check covers the public keyboard contract");
+  await page.goto("/");
+
+  const privacy = page.getByRole("link", { name: "Privacy" });
+  const terms = page.getByRole("link", { name: "Terms" });
+  await expect(privacy).toHaveAttribute("href", "/privacy");
+  await expect(terms).toHaveAttribute("href", "/terms");
+
+  for (const name of ["How it works", "Features", "Sign in", "Get started"]) {
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole(name === "How it works" || name === "Features" ? "button" : "link", { name, exact: true }).first()).toBeFocused();
+  }
+
+  const start = page.getByRole("link", { name: "Get started", exact: true }).first();
+  expect(await start.evaluate(node => getComputedStyle(node).boxShadow)).not.toBe("none");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/signin$/);
+});
+
 test("cinematic story exposes one readable scene at every scroll checkpoint", async ({ page }, testInfo) => {
   await page.goto("/");
 
