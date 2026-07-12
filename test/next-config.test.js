@@ -187,7 +187,9 @@ test("matchmaking queue status is informational, not a premium priority upsell",
 
   assert.equal(page.includes('<button\\n              style={{\\n                padding: "14px 36px", borderRadius: 999, cursor: "default"'), false);
   assert.equal(page.includes('role="status"'), true);
-  assert.equal(page.includes("Your signal is live"), true);
+  assert.equal(page.includes("Checking active squads"), true);
+  assert.equal(page.includes("Matching your squad's vibes"), true);
+  assert.equal(page.includes("Finding the strongest live match"), true);
   assert.equal(page.includes("Finding your squad"), false);
   assert.equal(page.includes("Fast Pass"), false);
   assert.equal(page.includes("priority"), false);
@@ -207,7 +209,8 @@ test("desktop matchmaking cancel stays put when backend cancel fails", () => {
   const page = matchmakingSource();
 
   assert.equal(page.includes("const [cancelError, setCancelError]"), true);
-  assert.equal(page.includes("setCancelError((e as { message?: string })?.message || \"Couldn't cancel search yet.\")"), true);
+  assert.equal(page.includes("Couldn't cancel search. Your squad is still in the queue."), true);
+  assert.equal(page.includes('cancelError ? "Try cancel again" : "Cancel search"'), true);
   assert.equal(page.includes('router.push(`/lobby?squad=${squadId}`);'), true);
 });
 

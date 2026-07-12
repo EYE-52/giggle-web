@@ -453,7 +453,7 @@ git commit -m "feat: prioritize readiness in the Giggle lobby"
 - Create: `e2e/matchmaking.spec.ts`
 - Modify: `docs/GIGGLE-WEB-CHECKLIST.md`
 
-- [ ] **Step 1: Write progress, cancel, and deduplication contracts**
+- [x] **Step 1: Write progress, cancel, and deduplication contracts**
 
 Create `e2e/matchmaking.spec.ts`:
 
@@ -473,13 +473,13 @@ test("match confirmation keeps join and skip stable", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 ```bash
 pnpm test:e2e --project=phone e2e/matchmaking.spec.ts
 ```
 
-- [ ] **Step 3: Derive meaningful progress from elapsed time**
+- [x] **Step 3: Derive meaningful progress from elapsed time**
 
 In `app/(app)/matchmaking/page.tsx`, add:
 
@@ -493,15 +493,15 @@ const progressLabel = elapsed < 4
 
 Render it in an element with `role="status"` and `aria-live="polite"`. Keep the elapsed timer as secondary data.
 
-- [ ] **Step 4: Preserve the existing single-reveal guard**
+- [x] **Step 4: Preserve the existing single-reveal guard**
 
 Keep `revealedRef` as the single source of truth for socket and polling events. Add a named helper that returns early when already revealed and ensure both event paths call only that helper.
 
-- [ ] **Step 5: Make cancellation retryable without discarding squad state**
+- [x] **Step 5: Make cancellation retryable without discarding squad state**
 
 When `api.cancelSearch` fails, leave the page and squad intact, show `cancelError` with `role="alert"`, and change the same button label to `Try cancel again` after the failure.
 
-- [ ] **Step 6: Verify timers and navigation cleanup**
+- [x] **Step 6: Verify timers and navigation cleanup**
 
 Run:
 
@@ -512,7 +512,7 @@ pnpm build
 
 Expected: browser tests PASS with no duplicate navigation or timer warnings.
 
-- [ ] **Step 7: Update and commit**
+- [x] **Step 7: Update and commit**
 
 ```bash
 git add app/'(app)'/matchmaking/page.tsx app/'(app)'/match/page.tsx e2e/matchmaking.spec.ts docs/GIGGLE-WEB-CHECKLIST.md

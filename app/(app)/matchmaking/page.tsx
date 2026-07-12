@@ -55,6 +55,11 @@ function MatchmakingInner() {
   const [cancelHover, setCancelHover] = useState(false);
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const progressLabel = elapsed < 4
+    ? "Checking active squads"
+    : elapsed < 10
+      ? "Matching your squad's vibes"
+      : "Finding the strongest live match";
 
   useEffect(() => {
     if (!squadId) return;
@@ -109,7 +114,7 @@ function MatchmakingInner() {
       await api.cancelSearch(squadId);
     } catch (e) {
       console.error("cancelSearch failed:", e);
-      setCancelError((e as { message?: string })?.message || "Couldn't cancel search yet.");
+      setCancelError("Couldn't cancel search. Your squad is still in the queue.");
       setCancelling(false);
       return;
     }
@@ -491,6 +496,7 @@ function MatchmakingInner() {
         <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
           <div
             role="status"
+            aria-live="polite"
             style={{
               padding: isShortPhone ? "10px 20px" : "14px 36px", borderRadius: 999,
               background: "linear-gradient(135deg, rgba(194,255,61,0.15), rgba(124,92,255,0.25))",
@@ -502,7 +508,7 @@ function MatchmakingInner() {
             }}
           >
             <Icon.lightning size={18} color="var(--lime-text, #C2FF3D)" />
-            Your signal is live
+            {progressLabel}
           </div>
           <div style={{ color: textMuted, fontSize: isShortPhone ? 12 : 13 }}>
             We&apos;ll bring you a compatible squad as soon as one is online.
@@ -530,7 +536,7 @@ function MatchmakingInner() {
             justifyContent: "center" as const,
           }}
         >
-          {cancelling ? "Cancelling…" : "Cancel search"}
+          {cancelling ? "Cancelling…" : cancelError ? "Try cancel again" : "Cancel search"}
         </button>
         {cancelError && (
           <div role="alert" style={{

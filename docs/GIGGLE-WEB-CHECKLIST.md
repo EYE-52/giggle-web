@@ -95,12 +95,20 @@ Lobby evidence from 2026-07-12:
 
 ## Milestone 4: Matchmaking and Match Confirmation
 
-- [ ] Show meaningful search stages instead of an indefinite spinner
-- [ ] Keep cancellation visible and safe
-- [ ] Preserve the squad when cancellation or polling fails
-- [ ] Deduplicate socket and polling match-found events
+- [x] Show meaningful search stages instead of an indefinite spinner
+- [x] Keep cancellation visible and safe
+- [x] Preserve the squad when cancellation or polling fails
+- [x] Deduplicate socket and polling match-found events
 - [ ] Verify timeout, retry, cancellation, and match-found handoff
-- [ ] Capture phone, tablet, and desktop evidence
+- [x] Capture phone, tablet, and desktop evidence
+
+Matchmaking evidence from 2026-07-12:
+
+- Queue status advances through active-squad checking, vibe matching, and strongest-live-match stages.
+- Socket and polling events retain the existing single-reveal guard and timer cleanup.
+- Failed cancellation keeps the squad queued, explains that state, and changes the action to `Try cancel again`.
+- `pnpm test:e2e e2e/matchmaking.spec.ts`: 6 passed, 4 intentionally skipped duplicate recovery checks.
+- Screenshots: `artifacts/visual-audit/2026-07-12/matchmaking/`.
 
 ## Milestone 5: Live Encounter
 
