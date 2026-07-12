@@ -137,7 +137,7 @@ Encounter evidence from 2026-07-12:
 - [x] Apply the visual system to Home, Discover, Friends, Profile, and Premium
 - [x] Remove card/pill clutter and keep one primary action per state
 - [ ] Standardize loading, empty, failure, offline, and success feedback
-- [ ] Verify theme behavior, focus rings, touch targets, and text contrast
+- [x] Verify theme behavior, focus rings, touch targets, and text contrast
 
 Navigation evidence from 2026-07-12:
 
@@ -155,6 +155,9 @@ Product-route evidence from 2026-07-12:
 - Wallet remains informational while payments are deferred and exposes no misleading buy, subscribe, or checkout action.
 - `pnpm test:e2e e2e/product-routes.spec.ts`: 25 passed across five viewport projects.
 - Screenshots: `artifacts/visual-audit/2026-07-12/product-routes/`.
+- Saved light mode survives reload, keyboard users can reveal and activate the skip link, and focused controls expose a visible ring.
+- Phone shell navigation and utilities retain at least 44x44 CSS-pixel targets; primary body-text tokens clear 4.5:1 contrast in both themes.
+- `pnpm test:e2e e2e/shell-accessibility.spec.ts`: 3 passed, 7 intentionally skipped duplicate viewport checks.
 
 ## Milestone 7: Release Gate
 
