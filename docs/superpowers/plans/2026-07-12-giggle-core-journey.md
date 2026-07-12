@@ -168,209 +168,53 @@ git add package.json pnpm-lock.yaml .gitignore playwright.config.ts e2e/landing.
 git commit -m "test: add Giggle responsive browser safety rails"
 ```
 
-### Task 2: Restore the Three-Use-Case Scroll Story
+### Task 2: Repair the Existing Three-Use-Case Scroll Story
+
+The repository already contained a strong `DemoStage`, scroll-progress hook, and
+eight-second cinematic asset. Adding a second story would duplicate product copy
+and increase landing-page length, so this task repairs and verifies the existing
+surface in place.
 
 **Files:**
-- Create: `components/landing/useStoryProgress.ts`
-- Create: `components/landing/UseCaseStory.tsx`
 - Modify: `app/page.tsx`
-- Modify: `app/globals.css`
 - Modify: `e2e/landing.spec.ts`
+- Add: `public/landing/demo-poster.jpg`
 - Modify: `docs/GIGGLE-WEB-CHECKLIST.md`
 
-- [ ] **Step 1: Write the failing three-scene contract**
+- [x] **Step 1: Capture the existing sequence and identify transition defects**
 
-Add to `e2e/landing.spec.ts`:
+The initial start/middle/end audit showed adjacent large captions overlapping
+during cross-fades.
 
-```ts
-test("landing reveals the three product use cases", async ({ page }, testInfo) => {
-  await page.goto("/");
-  const story = page.getByTestId("use-case-story");
-  await expect(story).toBeVisible();
-  await expect(story.getByRole("heading", { name: "Form your squad" })).toBeVisible();
+- [x] **Step 2: Write and run a failing single-active-caption contract**
 
-  const titles = ["Form your squad", "Meet another squad", "Keep the connection"];
-  for (let index = 0; index < titles.length; index += 1) {
-    await story.evaluate((node, i) => {
-      const section = node as HTMLElement;
-      window.scrollTo({ top: section.offsetTop + section.offsetHeight * (Number(i) / 3), behavior: "instant" });
-    }, index);
-    await expect(story.getByRole("heading", { name: titles[index] })).toBeVisible();
-  }
+The browser test initially failed because the story and captions did not expose a
+stable active-scene contract.
 
-  await page.screenshot({
-    path: `artifacts/visual-audit/2026-07-12/landing/${testInfo.project.name}-story.png`,
-    fullPage: true,
-  });
-});
-```
+- [x] **Step 3: Mount one active caption at a time**
 
-- [ ] **Step 2: Run the story test and confirm RED**
+Keep video scrubbing continuous, but switch the caption as one keyed unit so
+large display text never collides.
 
-Run:
+- [x] **Step 4: Add a real poster and reduced-motion composition**
 
-```bash
-pnpm test:e2e --project=desktop e2e/landing.spec.ts
-```
+Extract a representative frame from `demo.mp4`. Motion-enabled browsers use it
+as the video poster; reduced-motion browsers render it directly and avoid the
+sticky scroll track.
 
-Expected: FAIL because `use-case-story` does not exist.
+- [x] **Step 5: Verify the intended scene and decoded media pixels**
 
-- [ ] **Step 3: Add the reduced-motion-aware progress hook**
+At progress `0.16`, `0.50`, and `0.84`, assert the expected heading, one active
+caption, settled entrance opacity, decoded video time, luminance range, and
+non-dark pixel ratio.
 
-Create `components/landing/useStoryProgress.ts`:
+- [x] **Step 6: Capture all responsive and reduced-motion evidence**
 
-```ts
-"use client";
+Evidence lives in `artifacts/visual-audit/2026-07-12/landing-story/`.
 
-import { useEffect, useRef, useState } from "react";
+- [x] **Step 7: Run the full unit, browser, and production-build gate**
 
-export function useStoryProgress(enabled: boolean) {
-  const ref = useRef<HTMLElement | null>(null);
-  const [progress, setProgress] = useState(enabled ? 0 : 0.5);
-
-  useEffect(() => {
-    const section = ref.current;
-    if (!section || !enabled) return;
-
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const rect = section.getBoundingClientRect();
-      const distance = Math.max(1, rect.height - window.innerHeight);
-      setProgress(Math.min(1, Math.max(0, -rect.top / distance)));
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-
-    update();
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    return () => {
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [enabled]);
-
-  return { ref, progress };
-}
-```
-
-- [ ] **Step 4: Create the responsive story component**
-
-Create `components/landing/UseCaseStory.tsx` with these scene contracts:
-
-```tsx
-"use client";
-
-import Image from "next/image";
-import { useStoryProgress } from "./useStoryProgress";
-
-const scenes = [
-  { title: "Form your squad", copy: "Bring the people you already trust into one room.", image: "/landing/group1.jpg" },
-  { title: "Meet another squad", copy: "Match by vibe and enter a live group encounter together.", image: "/landing/call1.jpg" },
-  { title: "Keep the connection", copy: "Add the people you clicked with and meet again.", image: "/landing/group2.jpg" },
-] as const;
-
-export function UseCaseStory({ reducedMotion }: { reducedMotion: boolean }) {
-  const { ref, progress } = useStoryProgress(!reducedMotion);
-  const active = Math.min(scenes.length - 1, Math.floor(progress * scenes.length));
-
-  return (
-    <section ref={ref} data-testid="use-case-story" className="gg-story" aria-label="How Giggle works">
-      <div className="gg-story__stage">
-        {scenes.map((scene, index) => (
-          <article
-            key={scene.title}
-            data-active={active === index}
-            className="gg-story__scene"
-            aria-hidden={active !== index && !reducedMotion}
-          >
-            <Image src={scene.image} alt="" fill sizes="(max-width: 1023px) 100vw, 70vw" />
-            <div className="gg-story__scrim" />
-            <div className="gg-story__copy">
-              <span>0{index + 1}</span>
-              <h2>{scene.title}</h2>
-              <p>{scene.copy}</p>
-            </div>
-          </article>
-        ))}
-        <nav aria-label="Use cases" className="gg-story__steps">
-          {scenes.map((scene, index) => <span key={scene.title} data-active={active === index}>{index + 1}</span>)}
-        </nav>
-      </div>
-    </section>
-  );
-}
-```
-
-- [ ] **Step 5: Add the desktop pinned and touch sequential layouts**
-
-In `app/globals.css`, add:
-
-```css
-.gg-story { position: relative; min-height: 300vh; background: #07070b; }
-.gg-story__stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
-.gg-story__scene { position: absolute; inset: 0; opacity: 0; transform: scale(1.035); transition: opacity .55s var(--ease-out), transform 1s var(--ease-out); }
-.gg-story__scene[data-active="true"] { opacity: 1; transform: scale(1); }
-.gg-story__scene img { object-fit: cover; }
-.gg-story__scrim { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(7,7,11,.9) 0%, rgba(7,7,11,.35) 58%, rgba(7,7,11,.5) 100%); }
-.gg-story__copy { position: absolute; left: max(6vw, 40px); bottom: 12vh; z-index: 2; max-width: 720px; }
-.gg-story__copy span { color: var(--violet-bright); font-weight: 800; letter-spacing: .18em; }
-.gg-story__copy h2 { margin-top: 18px; color: #fff; font: 700 clamp(48px, 7vw, 104px)/.92 var(--font-space-grotesk); letter-spacing: -.05em; }
-.gg-story__copy p { margin-top: 22px; max-width: 520px; color: #c9c9da; font-size: clamp(17px, 1.5vw, 22px); line-height: 1.55; }
-.gg-story__steps { position: absolute; right: max(4vw, 28px); bottom: 7vh; z-index: 3; display: flex; gap: 8px; }
-.gg-story__steps span { width: 28px; height: 3px; overflow: hidden; border-radius: 4px; background: rgba(255,255,255,.28); color: transparent; }
-.gg-story__steps span[data-active="true"] { background: var(--violet-bright); }
-
-@media (max-width: 1023px) {
-  .gg-story { min-height: auto; }
-  .gg-story__stage { position: static; height: auto; }
-  .gg-story__scene { position: relative; min-height: min(78svh, 720px); opacity: 1; transform: none; }
-  .gg-story__scene + .gg-story__scene { border-top: 1px solid rgba(255,255,255,.1); }
-  .gg-story__copy { left: 24px; right: 24px; bottom: 40px; }
-  .gg-story__copy h2 { font-size: clamp(38px, 11vw, 64px); }
-  .gg-story__steps { display: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gg-story { min-height: auto; }
-  .gg-story__stage { position: static; height: auto; }
-  .gg-story__scene { position: relative; min-height: 72svh; opacity: 1; transform: none; transition: none; }
-}
-```
-
-- [ ] **Step 6: Integrate the story after the trust bridge**
-
-In `app/page.tsx`, import and render:
-
-```tsx
-import { UseCaseStory } from "@/components/landing/UseCaseStory";
-
-// After the existing full-bleed hook band:
-<UseCaseStory reducedMotion={reduce} />
-```
-
-Remove the older duplicate three-card `How it works` block after confirming the new story includes all three use cases. Keep the existing full-bleed demo only if it demonstrates a different product state.
-
-- [ ] **Step 7: Verify all story modes**
-
-Run:
-
-```bash
-pnpm test:e2e e2e/landing.spec.ts
-pnpm build
-```
-
-Expected: all five viewport projects PASS; desktop uses a pinned sequence, phone/tablet show all scenes sequentially, and reduced motion shows all content without transforms.
-
-- [ ] **Step 8: Update the checklist and commit**
-
-```bash
-git add components/landing app/page.tsx app/globals.css e2e/landing.spec.ts docs/GIGGLE-WEB-CHECKLIST.md
-git commit -m "feat: restore Giggle three-use-case scroll story"
-```
+- [x] **Step 8: Commit the repaired story**
 
 ### Task 3: Curate Shared Navigation by Device Class
 

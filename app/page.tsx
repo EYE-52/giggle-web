@@ -572,7 +572,7 @@ export default function LandingPage() {
         {/* ===================== FULL-BLEED CINEMATIC SCRUB TAKEOVER (demo.mp4) ===================== */}
         {/* Tall pinned section: while in view, demo.mp4 fills the whole viewport and
             scrubs with scroll. Edge fades melt it into #07070B above/below. */}
-        <section ref={scrubRef} style={{ position: "relative", height: reduce ? "auto" : isPhone ? "170vh" : "210vh" }}>
+        <section data-testid="use-case-story" ref={scrubRef} style={{ position: "relative", height: reduce ? "auto" : isPhone ? "170vh" : "210vh" }}>
           <div style={{ position: reduce ? "relative" : "sticky", top: 0, height: reduce ? "auto" : "100svh", minHeight: reduce ? "70vh" : undefined, overflow: "hidden" }}>
             <DemoStage p={p} reduce={reduce} isPhone={isPhone} pad={pad} maxW={maxW} scrollTo={scrollTo} />
           </div>
@@ -666,8 +666,8 @@ export default function LandingPage() {
  * DemoStage — FULL-BLEED cinematic takeover. While the tall pinned section is
  * in view, /landing/demo.mp4 fills the entire sticky viewport and SCRUBS with
  * scroll (currentTime = p * duration, Apple-style — not autoplay). Edge fades +
- * vignette + a light brand tint melt it into #07070B. Overlaid copy cross-fades
- * through stages tied to `p`. The animated mock only shows if the video is
+ * vignette + a light brand tint melt it into #07070B. Overlaid copy switches
+ * cleanly through stages tied to `p`. The animated mock only shows if the video is
  * missing/errors. Reduced-motion: static frame + readable copy, no pin.
  * ======================================================================== */
 function DemoStage({ p, reduce, isPhone, pad, maxW, scrollTo }: {
@@ -710,26 +710,32 @@ function DemoStage({ p, reduce, isPhone, pad, maxW, scrollTo }: {
     try { v.currentTime = t; } catch { /* seeking before ready */ }
   }, [p, failed, duration]);
 
-  // 3 cross-fading caption stages tied to scroll.
+  // Three discrete caption stages tied to scroll. Only one caption is mounted at
+  // a time so large display text can never collide while the video keeps scrubbing.
   const STAGES = [
     { t: "Your squad forms", sub: "Pull your crew in — solo or up to eight.", c: C.violet },
     { t: "Matched by vibe", sub: "We pair you with a squad on your wavelength.", c: C.teal },
     { t: "You're live. 2v2.", sub: "Drop into a live group video room together.", c: C.lime },
   ];
   const active = p < 0.33 ? 0 : p < 0.66 ? 1 : 2;
-  // smooth per-stage opacity (cross-fade)
-  const stageOp = (i: number) => {
-    const center = [0.16, 0.5, 0.84][i];
-    return clamp01(1 - Math.abs(p - center) / 0.26);
-  };
+  const activeStage = STAGES[active];
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", minHeight: reduce ? "70vh" : "100svh", overflow: "hidden", background: "linear-gradient(160deg,#120c28,#0b0b14 55%,#07070b)" }}>
       {/* ---- Full-viewport scrubbed video ---- */}
-      {!failed && (
+      {reduce ? (
+        <img
+          data-testid="demo-poster"
+          src="/landing/demo-poster.jpg"
+          alt=""
+          aria-hidden
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block", filter: "brightness(0.82) contrast(1.05) saturate(0.96)", zIndex: 1 }}
+        />
+      ) : !failed && (
         <video
           ref={videoRef}
           muted playsInline preload="auto"
+          poster="/landing/demo-poster.jpg"
           onLoadedMetadata={onLoaded}
           onError={() => setFailed(true)}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block", filter: "brightness(0.82) contrast(1.05) saturate(0.96)", zIndex: 1 }}
@@ -755,19 +761,20 @@ function DemoStage({ p, reduce, isPhone, pad, maxW, scrollTo }: {
       <div style={{ position: "absolute", zIndex: 4, left: 0, right: 0, bottom: isPhone ? "8%" : "12%", padding: `0 ${pad}px`, pointerEvents: "none" }}>
         <div style={{ width: "100%", maxWidth: maxW, margin: "0 auto" }}>
           <SectionLabel>The encounter</SectionLabel>
-          {/* cross-fading captions stacked in place */}
+          {/* One mounted caption prevents headline collisions during scrubbing. */}
           <div style={{ position: "relative", marginTop: 14, height: isPhone ? 132 : 168 }}>
-            {STAGES.map((s, i) => {
-              const op = reduce ? (i === active ? 1 : 0) : stageOp(i);
-              return (
-                <div key={s.t} style={{ position: "absolute", inset: 0, opacity: op, transform: reduce ? "none" : `translateY(${(1 - op) * 14}px)`, transition: "opacity .5s ease, transform .5s ease", pointerEvents: "none" }}>
-                  <h2 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: isPhone ? "clamp(40px,12vw,56px)" : 86, letterSpacing: "-.045em", lineHeight: 0.96, margin: 0, textShadow: "0 8px 40px rgba(0,0,0,.6)", maxWidth: 820 }}>
-                    {s.t}
-                  </h2>
-                  <p style={{ fontSize: isPhone ? 16 : 20, lineHeight: 1.5, color: C.body, margin: "16px 0 0", maxWidth: 440, textShadow: "0 2px 18px rgba(0,0,0,.7)" }}>{s.sub}</p>
-                </div>
-              );
-            })}
+            <div
+              key={activeStage.t}
+              data-testid="demo-caption"
+              aria-hidden="false"
+              className={reduce ? undefined : "gg-reveal"}
+              style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+            >
+              <h2 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: isPhone ? "clamp(40px,12vw,56px)" : 86, letterSpacing: "-.045em", lineHeight: 0.96, margin: 0, textShadow: "0 8px 40px rgba(0,0,0,.6)", maxWidth: 820 }}>
+                {activeStage.t}
+              </h2>
+              <p style={{ fontSize: isPhone ? 16 : 20, lineHeight: 1.5, color: C.body, margin: "16px 0 0", maxWidth: 440, textShadow: "0 2px 18px rgba(0,0,0,.7)" }}>{activeStage.sub}</p>
+            </div>
           </div>
 
           {/* progress pills reflecting the active stage */}

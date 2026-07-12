@@ -15,12 +15,12 @@ Design source of truth: `docs/superpowers/specs/2026-07-12-giggle-web-experience
 - [x] Confirm the standalone repository and Vercel configuration
 - [x] Inventory routes, shared components, assets, workspace packages, and existing tests
 - [x] Persist and commit the product/responsive experience design
-- [ ] Restore a clean generated `next-env.d.ts` state without overwriting user work
+- [x] Restore a clean generated `next-env.d.ts` state without overwriting user work
 - [x] Run the existing unit tests and production build
 - [x] Start the frontend against the configured backend
 - [x] Capture baseline screenshots at 390x844, 768x1024, 1280x800, 1440x1100, and 1728x1117
 - [x] Record console errors, failed requests, and layout overflow
-- [ ] Run automated blank-media pixel checks for landing video
+- [x] Run automated blank-media pixel checks for landing video
 - [x] Add Playwright browser coverage and screenshot directories
 
 Baseline evidence from 2026-07-12:
@@ -36,14 +36,25 @@ Baseline evidence from 2026-07-12:
 
 ## Milestone 1: Public Landing
 
-- [ ] Keep the live squad-versus-squad product as the first viewport signal
-- [ ] Restore the scroll-driven three-use-case story: form squad, meet squad, keep connection
-- [ ] Use a pinned scrub sequence on desktop and sequential/swipe scenes on touch layouts
-- [ ] Reserve stable dimensions for hero and story media
-- [ ] Provide poster/fallback imagery for every video
+- [x] Keep the live squad-versus-squad product as the first viewport signal
+- [x] Restore the scroll-driven three-use-case story: form squad, match by vibe, meet live
+- [x] Use a curated pinned scrub sequence with a shorter phone scroll track
+- [x] Reserve stable dimensions for hero and story media
+- [x] Provide poster/fallback imagery for every active landing video
 - [ ] Verify navigation, CTA, trust copy, privacy links, reduced motion, and keyboard access
 - [ ] Remove visual effects that do not strengthen hierarchy or product understanding
-- [ ] Capture phone, tablet, laptop, desktop, wide-desktop, and reduced-motion evidence
+- [x] Capture phone, tablet, laptop, desktop, wide-desktop, and reduced-motion evidence
+
+Story evidence from 2026-07-12:
+
+- Existing `DemoStage` retained; duplicate story components were deliberately not added.
+- Scene-caption collision fixed by mounting exactly one active caption.
+- Real poster frame added for slow media and reduced-motion users.
+- Browser checks validate the expected title and nonblank decoded video pixels at all three scroll checkpoints.
+- `pnpm test:e2e e2e/landing.spec.ts --grep "cinematic story"`: 6 passed, 4 intentionally skipped viewport duplicates.
+- Complete landing browser gate: 16 passed, 4 intentionally skipped reduced-motion viewport duplicates.
+- `pnpm build`: passed after the story repair; TypeScript clean and all 19 static routes generated.
+- Screenshots: `artifacts/visual-audit/2026-07-12/landing-story/`.
 
 ## Milestone 2: Sign-In and Session Handoff
 
