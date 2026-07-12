@@ -97,11 +97,19 @@ Story evidence from 2026-07-12:
 
 ## Milestone 6: Shared Product Experience
 
-- [ ] Curate authenticated navigation separately for phone, tablet, and desktop
+- [x] Curate authenticated navigation separately for phone, tablet, and desktop
 - [ ] Apply the visual system to Home, Discover, Friends, Profile, and Premium
 - [ ] Remove card/pill clutter and keep one primary action per state
 - [ ] Standardize loading, empty, failure, offline, and success feedback
 - [ ] Verify theme behavior, focus rings, touch targets, and text contrast
+
+Navigation evidence from 2026-07-12:
+
+- Phone uses a safe-area-aware four-destination bottom bar while theme and notifications remain in a quiet top utility bar.
+- Tablet uses icon-first top navigation; laptop, desktop, and wide desktop use labeled top navigation.
+- Active destinations expose `aria-current="page"`, and phone content reserves space for the fixed bar.
+- `pnpm test:e2e e2e/navigation.spec.ts`: 5 passed.
+- Screenshots: `artifacts/visual-audit/2026-07-12/navigation/`.
 
 ## Milestone 7: Release Gate
 

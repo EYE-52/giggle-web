@@ -58,6 +58,7 @@ export function TopNav() {
       };
 
   return (
+    <>
     <header
       style={{
         position: "sticky",
@@ -89,7 +90,7 @@ export function TopNav() {
           {isPhone ? <Logomark size={28} /> : <Wordmark size={20} />}
         </Link>
 
-        <nav aria-label="Primary navigation" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: isPhone ? 0 : 4 }}>
+        <nav data-testid="desktop-navigation" aria-label="Primary navigation" style={{ display: isPhone ? "none" : "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
           {NAV.map(({ href, label, icon: I }) => {
             const active = path === href;
             const isHovered = hovered === href;
@@ -101,6 +102,7 @@ export function TopNav() {
                 onMouseEnter={() => setHovered(href)}
                 onMouseLeave={() => setHovered(null)}
                 aria-label={label}
+                aria-current={active ? "page" : undefined}
                 title={isTablet ? label : undefined}
                 style={{
                   display: "inline-flex",
@@ -220,5 +222,22 @@ export function TopNav() {
         </div>
       </div>
     </header>
+    <nav data-testid="mobile-navigation" className="gg-mobile-nav" aria-label="Primary navigation">
+      {NAV.map(({ href, label, icon: ItemIcon }) => {
+        const active = path === href;
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? "page" : undefined}
+            className="gg-mobile-nav__item"
+          >
+            <ItemIcon size={21} color={active ? "var(--violet-bright)" : "var(--text-muted)"} strokeWidth={2} />
+            <span>{label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+    </>
   );
 }

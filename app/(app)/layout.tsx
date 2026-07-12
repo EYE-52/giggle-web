@@ -67,6 +67,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main
         id="main-content"
         tabIndex={-1}
+        className="gg-app-main"
         style={
           isCalling
             ? {

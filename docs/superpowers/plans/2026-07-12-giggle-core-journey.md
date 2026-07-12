@@ -225,7 +225,7 @@ Evidence lives in `artifacts/visual-audit/2026-07-12/landing-story/`.
 - Create: `e2e/navigation.spec.ts`
 - Modify: `app/globals.css`
 
-- [ ] **Step 1: Write the failing navigation contracts**
+- [x] **Step 1: Write the failing navigation contracts**
 
 Create `e2e/navigation.spec.ts`:
 
@@ -244,7 +244,7 @@ test("phone uses bottom navigation and desktop uses top navigation", async ({ pa
 });
 ```
 
-- [ ] **Step 2: Run the contract and confirm RED**
+- [x] **Step 2: Run the contract and confirm RED**
 
 ```bash
 pnpm test:e2e e2e/navigation.spec.ts
@@ -252,7 +252,7 @@ pnpm test:e2e e2e/navigation.spec.ts
 
 Expected: FAIL because the current nav has no separate phone surface.
 
-- [ ] **Step 3: Extend the viewport contract without adding a dependency**
+- [x] **Step 3: Extend the viewport contract without adding a dependency**
 
 Return these fields from `components/useViewport.ts`:
 
@@ -268,7 +268,7 @@ return {
 };
 ```
 
-- [ ] **Step 4: Render dedicated phone and desktop navigation surfaces**
+- [x] **Step 4: Render dedicated phone and desktop navigation surfaces**
 
 In `components/TopNav.tsx`, keep the existing `NAV` source and render two nav elements:
 
@@ -289,7 +289,7 @@ In `components/TopNav.tsx`, keep the existing `NAV` source and render two nav el
 
 Add CSS that fixes `.gg-mobile-nav` to the safe-area-aware bottom edge below 600px and hides it otherwise. Hide `.gg-desktop-nav` below 1024px and keep the compact icon top nav for tablet.
 
-- [ ] **Step 5: Protect page content from fixed navigation**
+- [x] **Step 5: Protect page content from fixed navigation**
 
 In `app/(app)/layout.tsx`, add `className="gg-app-main"` to `main`; in `app/globals.css`, add:
 
@@ -299,7 +299,7 @@ In `app/(app)/layout.tsx`, add `className="gg-app-main"` to `main`; in `app/glob
 }
 ```
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 ```bash
 pnpm test:e2e e2e/navigation.spec.ts
