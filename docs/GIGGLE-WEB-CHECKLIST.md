@@ -112,14 +112,24 @@ Matchmaking evidence from 2026-07-12:
 
 ## Milestone 5: Live Encounter
 
-- [ ] Make participant media the dominant surface
-- [ ] Keep call controls stable across resize, phone rotation, and safe areas
-- [ ] Make mute, camera, connection, participant departure, and ended states clear
-- [ ] Verify grid, versus, spotlight, and focused-participant modes
-- [ ] Verify reactions, chat, report, leave, and end-call permissions
-- [ ] Clean up media tracks, socket listeners, timers, and pending navigation
-- [ ] Run canvas/video pixel checks and confirm nonblank media frames
-- [ ] Capture phone, tablet, desktop, wide-desktop, and reduced-motion evidence
+- [x] Make participant media the dominant surface
+- [x] Keep call controls stable across resize, phone rotation, and safe areas
+- [x] Make mute, camera, connection, participant departure, and ended states clear
+- [x] Verify grid, versus, spotlight, and focused-participant modes
+- [x] Verify reactions, chat, report, leave, and end-call permissions
+- [x] Clean up media tracks, socket listeners, timers, and pending navigation
+- [x] Run canvas/video pixel checks and confirm nonblank media frames
+- [x] Capture phone, tablet, desktop, wide-desktop, and reduced-motion evidence
+
+Encounter evidence from 2026-07-12:
+
+- Browser automation creates two real users, squads, queues, and a shared encounter before testing the UI.
+- Participant frames remain at usable dimensions in Versus, Grid, and Spotlight modes.
+- The control toolbar exposes stable microphone, camera, and end-action names and state.
+- Phone portrait and landscape, tablet, laptop, desktop, wide-desktop, and reduced-motion layouts pass.
+- Frame screenshots are downsampled and checked for luminance range/non-dark pixel ratio, catching blank media surfaces.
+- Ending the encounter performs backend cleanup and returns the leader to Home.
+- Screenshots: `artifacts/visual-audit/2026-07-12/encounter/`.
 
 ## Milestone 6: Shared Product Experience
 

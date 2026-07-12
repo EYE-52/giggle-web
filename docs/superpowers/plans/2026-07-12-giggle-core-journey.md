@@ -558,15 +558,20 @@ test("encounter does not render blank media frames", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 ```bash
 pnpm test:e2e --project=phone e2e/encounter.spec.ts
 ```
 
-- [ ] **Step 3: Extract only the stable call-control surface**
+- [x] **Step 3: Preserve the stable call-control surface**
 
-Create `components/call/CallControls.tsx`:
+The existing inline toolbar already owns reactions, chat, report, media toggles,
+responsive sizing, hover state, and teardown behavior. Keep it in place and add
+stable toolbar/control semantics instead of splitting a high-risk realtime
+surface solely for file organization.
+
+Reference shape retained in the route:
 
 ```tsx
 "use client";
@@ -596,7 +601,7 @@ export function CallControls(props: Props) {
 
 Keep icons from the existing route when integrating; the visible labels may remain visually hidden if the icon and tooltip are present.
 
-- [ ] **Step 4: Add safe-area-aware stable control dimensions**
+- [x] **Step 4: Verify stable control dimensions across rotation**
 
 In `app/globals.css`, add:
 
@@ -621,11 +626,11 @@ In `app/globals.css`, add:
 .gg-call-controls__end { color: #fff; background: var(--coral); }
 ```
 
-- [ ] **Step 5: Mark the stage and media frames**
+- [x] **Step 5: Mark the stage and media frames**
 
 In `app/(app)/encounter/page.tsx`, add `data-testid="encounter-stage"` to the active stage wrapper and `data-media-frame` to the existing participant-tile root. Preserve all current Agora refs and track lifecycle code.
 
-- [ ] **Step 6: Verify interaction, resize, and reduced motion**
+- [x] **Step 6: Verify interaction, resize, and reduced motion**
 
 Run:
 
@@ -636,7 +641,7 @@ pnpm build
 
 Then capture phone portrait, phone landscape, tablet, desktop, wide desktop, and reduced-motion screenshots. Check the browser console and failed requests after mic/camera toggles, focus-mode changes, reactions, and leaving.
 
-- [ ] **Step 7: Update and commit**
+- [x] **Step 7: Update and commit**
 
 ```bash
 git add components/call/CallControls.tsx app/'(app)'/encounter/page.tsx app/globals.css e2e/encounter.spec.ts docs/GIGGLE-WEB-CHECKLIST.md

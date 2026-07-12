@@ -316,6 +316,7 @@ function VideoTile({
 
   return (
     <div
+      data-media-frame
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -1628,7 +1629,7 @@ function EncounterInner() {
       active: micOn,
       danger: true,
       onClick: toggleMic,
-      title: micOn ? "Mute mic" : "Unmute mic",
+      title: micOn ? "Mute microphone" : "Unmute microphone",
     },
     {
       id: "cam",
@@ -2113,6 +2114,7 @@ function EncounterInner() {
 
             {/* Tile area — paddingBottom leaves space for the floating control bar */}
             <div
+              data-testid="encounter-stage"
               style={{
                 position: "relative",
                 zIndex: 1,
@@ -2139,6 +2141,9 @@ function EncounterInner() {
               }}
             >
               <div
+                data-testid="call-controls"
+                role="toolbar"
+                aria-label="Encounter controls"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -2189,6 +2194,7 @@ function EncounterInner() {
                       onMouseEnter={() => setHoveredCtrl(id)}
                       onMouseLeave={() => setHoveredCtrl(null)}
                       title={title}
+                      aria-label={title}
                       aria-pressed={typeof active === "boolean" ? active : undefined}
                       style={{
                         width: isPhone ? 40 : 48,
@@ -2227,6 +2233,7 @@ function EncounterInner() {
                     <button
                       onClick={() => setReactionsOpen((o) => !o)}
                       title="Reactions"
+                      aria-label="Reactions"
                       aria-expanded={reactionsOpen}
                       style={{
                         width: 40,
@@ -2269,6 +2276,7 @@ function EncounterInner() {
                             key={emoji}
                             onClick={() => { fireReaction(emoji); setReactionsOpen(false); }}
                             title={`React ${emoji}`}
+                            aria-label={`React ${emoji}`}
                             style={{
                               width: 40,
                               height: 40,
@@ -2305,6 +2313,7 @@ function EncounterInner() {
                 <button
                   onClick={handleEnd}
                   disabled={ending}
+                  aria-label="End encounter"
                   onMouseEnter={() => setHoveredCtrl("end")}
                   onMouseLeave={() => setHoveredCtrl(null)}
                   style={{
