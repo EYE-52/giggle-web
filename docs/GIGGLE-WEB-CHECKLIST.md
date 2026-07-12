@@ -174,7 +174,7 @@ Product-route evidence from 2026-07-12:
 - [x] Verify no horizontal overflow or overlapping controls at all target viewports
 - [x] Verify reduced motion and keyboard-only navigation
 - [x] Document final local URL, commands, screenshots, remaining risks, and deployment steps
-- [ ] Mark the active goal complete only after every required gate has evidence
+- [x] Mark the active goal complete only after every required gate has evidence
 
 Final release evidence from 2026-07-12:
 
@@ -184,6 +184,7 @@ Final release evidence from 2026-07-12:
 - `pnpm test:e2e`: 92 passed, 23 intentionally skipped duplicate viewport checks.
 - Production `pnpm build` with the configured backend URL: passed; 19 routes generated.
 - Browser checks cover console errors, failed requests, overflow, media pixels, phone landscape, reduced motion, keyboard navigation, theme persistence, focus, touch targets, and text contrast.
+- Canonical Node `22.13.0` dev server: `http://localhost:4000` returned HTTP 200; local backend `/api/stats` returned HTTP 200.
 - Deployment and residual-risk handoff: `docs/GIGGLE-WEB-HANDOFF.md`.
 
 ## Working Rules
