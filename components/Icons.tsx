@@ -36,10 +36,10 @@ export const Icon = {
   apple: ({ size = 18, color = "#F4F4F7" }: P) => (
     <Svg size={size} viewBox="0 0 17 20"><path fill={color} d="M14.1 15.3c-.3.7-.6 1.3-1 1.9-.6.8-1 1.4-1.4 1.7-.5.5-1.1.7-1.7.8-.4 0-1-.1-1.6-.4-.6-.2-1.2-.4-1.7-.4-.5 0-1.1.1-1.8.4-.6.3-1.1.4-1.5.4-.6 0-1.2-.3-1.8-.8-.4-.3-.9-.9-1.5-1.8C.5 16 0 14.4 0 12.8c0-1.4.3-2.7 1-3.7.5-.8 1.1-1.4 2-1.9.8-.4 1.6-.6 2.5-.7.4 0 1 .2 1.8.5.7.3 1.2.4 1.4.4.1 0 .7-.2 1.6-.5.8-.3 1.5-.4 2-.4 1.5.1 2.6.7 3.4 1.7-1.3.8-2 1.9-2 3.4 0 1.1.4 2.1 1.2 2.8.4.3.8.6 1.2.7-.1.3-.2.5-.3.8ZM10.6.4c0 1-.4 2-1.1 2.8-.9 1-2 1.6-3.2 1.5 0-.1 0-.2 0-.4 0-1 .4-2 1.2-2.8.4-.4.9-.8 1.5-1C9.5.4 10 .3 10.6.3v.1Z"/></Svg>
   ),
-  star: ({ size, color = "#C2FF3D", fill = "#C2FF3D" }: P) => (
+  star: ({ size, color = "#B7FF2A", fill = "#B7FF2A" }: P) => (
     <Svg size={size}><path d="m12 2.5 2.9 5.9 6.5.95-4.7 4.58 1.1 6.47L12 17.9l-5.8 3.06 1.1-6.47-4.7-4.58 6.5-.95L12 2.5Z" fill={fill} stroke={color} strokeWidth={1.2} strokeLinejoin="round" /></Svg>
   ),
-  lightning: ({ size, color, fill = "#7C5CFF" }: P) => (
+  lightning: ({ size, color, fill = "#7657FF" }: P) => (
     <Svg size={size}><path d="M13 2 4 13.5h6L9.5 22 20 10h-6.5L13 2Z" fill={fill} stroke={color ?? fill} strokeWidth={1.4} strokeLinejoin="round" /></Svg>
   ),
   hd: ({ size, color = "#F4F4F7" }: P) => (
@@ -81,10 +81,10 @@ export const Icon = {
   chevron: ({ size, color = "#9A9AB0", strokeWidth }: P) => (
     <Svg size={size}><path d="m9 6 6 6-6 6" {...base(color, strokeWidth ?? 2)} /></Svg>
   ),
-  pin: ({ size, color = "#C2FF3D" }: P) => (
+  pin: ({ size, color = "#B7FF2A" }: P) => (
     <Svg size={size}><path d="M12 21s-6.5-5.3-6.5-10.2A6.5 6.5 0 0 1 18.5 10.8C18.5 15.7 12 21 12 21Z" {...base(color, 1.9)} /><circle cx="12" cy="10.5" r="2.3" {...base(color, 1.9)} /></Svg>
   ),
-  trend: ({ size, color = "#C2FF3D" }: P) => (
+  trend: ({ size, color = "#B7FF2A" }: P) => (
     <Svg size={size}><path d="M3 17l6-6 4 4 7-8M16 7h5v5" {...base(color, 2)} /></Svg>
   ),
   gift: ({ size, color, strokeWidth }: P) => (

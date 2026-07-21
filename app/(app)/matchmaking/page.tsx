@@ -7,6 +7,8 @@ import { Icon } from "@/components/Icons";
 import { api, connectSocket, SOCKET_EVENTS, session, getMyAvatar, subscribeAvatar, DEFAULT_AVATAR_ID } from "@giggle/core";
 import type { SquadState } from "@giggle/core";
 import { useViewport } from "@/components/useViewport";
+import { Button } from "@/components/Button";
+import { StatTile } from "@/components/StatTile";
 
 function MatchmakingInner() {
   const { height, isPhone } = useViewport();
@@ -21,10 +23,22 @@ function MatchmakingInner() {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [matchFound, setMatchFound] = useState<{ encounterId: string; opponentName?: string } | null>(null);
   const [matchVisible, setMatchVisible] = useState(false);
+  // Consecutive matchStatus poll failures — after ≥3 we surface a reconnect note.
+  const [pollFailures, setPollFailures] = useState(0);
+  const pollFailuresRef = useRef(0);
+  // getSquad failed even after one auto-retry — offer a manual retry link.
+  const [squadError, setSquadError] = useState(false);
+  // Long-search branch card: shown when (elapsed - baseline) ≥ 75s of searching.
+  // "Keep waiting" bumps the baseline so the card returns after another 75s.
+  const [longSearchBaseline, setLongSearchBaseline] = useState(0);
+  const showLongSearch = !matchFound && elapsed - longSearchBaseline >= 75;
   // Both the socket event and the 2s poll can fire — ensure we reveal/navigate once.
   const revealedRef = useRef(false);
   const revealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // getSquad silent auto-retry timer — cleared on unmount so the retry can't
+  // setState after the page is gone.
+  const squadRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function clearRevealTimers() {
     if (revealTimeoutRef.current) {
@@ -44,15 +58,12 @@ function MatchmakingInner() {
     return subscribeAvatar((v) => setMyAvatar(v));
   }, []);
 
-  const violet = "var(--violet)";
+  const violet = "var(--accent, var(--violet))";
   const lime = "var(--lime)";
   const limeText = "var(--lime-text)";
   const textPrimary = "var(--text)";
   const textMuted = "var(--text-muted)";
 
-  // Hover states
-  const [statHover, setStatHover] = useState<string | null>(null);
-  const [cancelHover, setCancelHover] = useState(false);
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   const progressLabel = elapsed < 4
@@ -64,18 +75,27 @@ function MatchmakingInner() {
   useEffect(() => {
     if (!squadId) return;
 
-    api.getSquad(squadId).then(setSquad).catch(() => {});
+    // Load squad; on failure attempt one silent auto-retry before surfacing "?".
+    fetchSquad(true);
 
     const tick = setInterval(() => setElapsed(e => e + 1), 1000);
 
     const pollInterval = setInterval(async () => {
       try {
         const status = await api.matchStatus(squadId);
+        // Poll succeeded — recover silently from any reconnect state.
+        if (pollFailuresRef.current > 0) {
+          pollFailuresRef.current = 0;
+          setPollFailures(0);
+        }
         if (status.state === "matched" && status.match) {
           clearInterval(pollInterval);
           triggerMatchReveal(status.match.encounterId);
         }
-      } catch {}
+      } catch {
+        pollFailuresRef.current += 1;
+        setPollFailures(pollFailuresRef.current);
+      }
     }, 2000);
 
     const socket = connectSocket(squadId);
@@ -89,9 +109,28 @@ function MatchmakingInner() {
       clearInterval(tick);
       clearInterval(pollInterval);
       clearRevealTimers();
+      if (squadRetryTimeoutRef.current) {
+        clearTimeout(squadRetryTimeoutRef.current);
+        squadRetryTimeoutRef.current = null;
+      }
       socket.off(SOCKET_EVENTS.MATCH_FOUND, onMatchFound);
     };
   }, [squadId, router]);
+
+  function fetchSquad(autoRetry = false) {
+    setSquadError(false);
+    api.getSquad(squadId).then(s => {
+      setSquad(s);
+      setSquadError(false);
+    }).catch(() => {
+      if (autoRetry) {
+        // One silent auto-retry before showing the "?" + retry link.
+        squadRetryTimeoutRef.current = setTimeout(() => fetchSquad(false), 1500);
+      } else {
+        setSquadError(true);
+      }
+    });
+  }
 
   function triggerMatchReveal(encounterId: string, opponentName?: string) {
     if (revealedRef.current) return;
@@ -100,14 +139,15 @@ function MatchmakingInner() {
     setMatchFound({ encounterId, opponentName });
     // Brief mount delay so the animation plays
     revealTimeoutRef.current = setTimeout(() => setMatchVisible(true), 30);
-    // Navigate after reveal (~1.6s)
+    // Navigate after reveal (~2s — leaves time for the SR announcement to land)
     navigationTimeoutRef.current = setTimeout(() => {
       router.push(`/match?squad=${squadId}&enc=${encounterId}`);
-    }, 1650);
+    }, 2000);
   }
 
   async function handleCancel() {
-    if (!squadId) return;
+    // No cancelling once the match reveal/navigation has started.
+    if (!squadId || cancelling || revealedRef.current) return;
     setCancelling(true);
     setCancelError(null);
     try {
@@ -136,9 +176,9 @@ function MatchmakingInner() {
           <div style={{ width: 58, height: 58, borderRadius: 18, margin: "0 auto 16px", display: "grid", placeItems: "center", background: "rgba(124,92,255,0.14)", border: "1px solid rgba(124,92,255,0.3)" }}>
             <Icon.discover size={25} color="var(--lime)" />
           </div>
-          <h1 style={{ margin: 0, color: textPrimary, fontFamily: "var(--font-space-grotesk)", fontSize: 25, letterSpacing: "-0.03em" }}>No squad selected</h1>
-          <p style={{ margin: "10px 0 22px", color: textMuted, lineHeight: 1.5, fontSize: 14.5 }}>Start matchmaking from a squad lobby so we know who to pair you with.</p>
-          <button onClick={() => router.push("/home")} className="gg-press" style={{ minHeight: 44, padding: "0 20px", borderRadius: 999, border: "none", background: "var(--violet)", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Back to home</button>
+          <h1 style={{ margin: 0, color: textPrimary, fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 22, fontWeight: 700, letterSpacing: "-0.03em" }}>No squad selected</h1>
+          <p style={{ margin: "10px 0 22px", color: textMuted, lineHeight: 1.5, fontSize: 14 }}>Start matchmaking from a squad lobby so we know who to pair you with.</p>
+          <Button onClick={() => router.push("/home")} variant="primary">Back to home</Button>
         </div>
       </div>
     );
@@ -236,14 +276,19 @@ function MatchmakingInner() {
 
       {/* Match-found overlay */}
       {matchFound && (
-        <div style={{
+        <div role="status" aria-live="assertive" style={{
           position: "fixed", inset: 0, zIndex: 100,
           background: "rgba(11,11,15,0.82)",
           backdropFilter: "blur(12px)",
           animation: "matchRevealBg 0.35s ease",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <div style={{
+          {/* SR announcement — visually hidden, read via the aria-live overlay */}
+          <span style={{
+            position: "absolute", width: 1, height: 1, padding: 0, margin: -1,
+            overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" as const, border: 0,
+          }}>Match found — starting now.</span>
+          <div aria-hidden style={{
             position: "absolute", top: "50%", left: "50%",
             animation: matchVisible ? "matchRevealCard 0.65s cubic-bezier(0.34,1.56,0.64,1) both" : "none",
             background: "linear-gradient(145deg, #1a1228 0%, #0e0e18 100%)",
@@ -262,7 +307,7 @@ function MatchmakingInner() {
               animation: "shimmer 1.4s linear infinite",
               borderRadius: 999,
               padding: "6px 20px",
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               letterSpacing: "0.14em",
               textTransform: "uppercase" as const,
@@ -270,8 +315,8 @@ function MatchmakingInner() {
             }}>Match Found</div>
 
             <div style={{
-              fontFamily: "var(--font-space-grotesk)",
-              fontSize: isPhone ? 28 : 38, fontWeight: 800, color: "#F4F4F7",
+              fontFamily: "var(--font-display, var(--font-space-grotesk))",
+              fontSize: isPhone ? 22 : 30, fontWeight: 700, color: "#F4F4F7",
               letterSpacing: "-0.03em", lineHeight: 1.1,
             }}>Squad located!</div>
 
@@ -282,8 +327,8 @@ function MatchmakingInner() {
               }}>
                 <div style={{ color: "#9A9AB0", fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase" as const }}>You matched with</div>
                 <div style={{
-                  fontFamily: "var(--font-space-grotesk)",
-                  fontSize: 24, fontWeight: 700, color: "#C2FF3D",
+                  fontFamily: "var(--font-display, var(--font-space-grotesk))",
+                  fontSize: 22, fontWeight: 700, color: "var(--lime-text, #C2FF3D)",
                 }}>{matchFound.opponentName}</div>
               </div>
             )}
@@ -417,14 +462,14 @@ function MatchmakingInner() {
 
         {/* Title + subtitle — clearly below the radar with real breathing room */}
         <div style={{ position: "relative", zIndex: 1, textAlign: "center", display: "flex", flexDirection: "column", gap: 8, maxWidth: 460 }}>
-          <h1 style={{ fontFamily: "var(--font-space-grotesk)", fontSize: isShortPhone ? 22 : isPhone ? 26 : 34, fontWeight: 800, color: textPrimary, letterSpacing: "-0.02em", margin: 0 }}>Finding your match…</h1>
-          <div style={{ color: textMuted, fontSize: isShortPhone ? 12 : isPhone ? 14 : 16 }}>
+          <h1 style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: isShortPhone ? 22 : isPhone ? 22 : 30, fontWeight: 700, color: textPrimary, letterSpacing: "-0.02em", margin: 0 }}>Finding your match…</h1>
+          <div style={{ color: textMuted, fontSize: isShortPhone ? 12 : 14 }}>
             {isShortPhone && elapsed >= 20 ? "Still searching — few squads are live right now." : "Looking for a squad that matches your crew's vibe."}
           </div>
           {/* Reassurance for a lone searcher with no match after ~20s — avoids the
               "stuck forever with no feedback" feeling. The Cancel button below is
               always available as the escape hatch. */}
-          {elapsed >= 20 && !matchFound && !isShortPhone && (
+          {elapsed >= 20 && !matchFound && !isShortPhone && !showLongSearch && (
             <div style={{
               marginTop: 4,
               maxWidth: 420,
@@ -442,54 +487,78 @@ function MatchmakingInner() {
           )}
         </div>
 
-        {/* ── Stats — one sleek glass readout bar that complements the radar ── */}
+        {/* ── Long-search branch card — after 75s with no match, offer clear paths
+            forward. Search keeps running unless the user bails. ── */}
+        {showLongSearch && (
+          <div role="status" style={{
+            position: "relative", zIndex: 2,
+            width: "min(440px, calc(100vw - 32px))",
+            background: "linear-gradient(145deg, #1a1228 0%, #0e0e18 100%)",
+            border: "1.5px solid rgba(124,92,255,0.38)",
+            borderRadius: "var(--radius-card, 20px)",
+            padding: isShortPhone ? "12px 14px" : isPhone ? "16px 18px" : "18px 22px",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.5)",
+            display: "flex", flexDirection: "column", gap: 12, textAlign: "center",
+          }}>
+            <div style={{ color: textPrimary, fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>
+              Still looking — no squads are free right now.
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" as const }}>
+              <Button variant="tonal" size="sm" onClick={() => setLongSearchBaseline(elapsed)}>Keep waiting</Button>
+              <Button variant="secondary" size="sm" onClick={() => router.push("/friends")}>Invite friends</Button>
+              <Button variant="ghost" size="sm" onClick={handleCancel} loading={cancelling}>Back to lobby</Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Stats — v3 StatTile row (spec 04) ── */}
         <div style={{
           position: "relative", zIndex: 1,
-          display: "flex", alignItems: "stretch",
-          background: "rgba(20,18,30,0.55)",
-          border: "1px solid rgba(124,92,255,0.20)",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
-          borderRadius: 18, overflow: "hidden",
-          boxShadow: "0 10px 44px -14px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05)",
-          maxWidth: "calc(100vw - 32px)",
+          display: "flex", gap: isShortPhone ? 8 : 12, justifyContent: "center",
+          maxWidth: "min(720px, calc(100vw - 32px))",
           flexWrap: "wrap" as const,
         }}>
-          {[
-            { label: "Elapsed", value: fmt(elapsed) },
-            { label: "Region", value: "Global" },
-            { label: "Squad Size", value: `${squad?.members.length ?? "?"} / 4` },
-            { label: "Status", value: "Searching" },
-          ].map(({ label, value }, i) => (
-            <div
-              key={label}
-              onMouseEnter={() => setStatHover(label)}
-              onMouseLeave={() => setStatHover(null)}
-              style={{
-                position: "relative",
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                padding: isShortPhone ? "7px 2px" : isPhone ? "10px 16px" : "14px 28px",
-                minWidth: isShortPhone ? 0 : isPhone ? 64 : 92,
-                width: isShortPhone ? "25%" : undefined,
-                boxSizing: "border-box",
-                background: statHover === label ? "rgba(124,92,255,0.10)" : "transparent",
-                borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.07)" : "none",
-                transition: "background .15s ease",
-              }}
-            >
-              <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: isShortPhone ? 11 : isPhone ? 16 : 21, fontWeight: 700, color: label === "Status" ? limeText : textPrimary, letterSpacing: "-0.02em", display: "inline-flex", alignItems: "center", gap: isShortPhone ? 2 : 7, justifyContent: "center" }}>
-                {label === "Status" && (
-                  <span style={{
-                    width: 9, height: 9, borderRadius: "50%", background: "var(--lime, #C2FF3D)",
-                    animation: "pulseDot 1.4s ease-in-out infinite", flexShrink: 0,
-                  }} />
+          <StatTile label="Elapsed" value={fmt(elapsed)} />
+          <StatTile
+            label="Squad size"
+            value={
+              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}>
+                {`${squad?.members.length ?? "?"} / 4`}
+                {squadError && !squad && (
+                  <button
+                    onClick={() => fetchSquad(false)}
+                    style={{
+                      padding: 0, border: "none", background: "transparent",
+                      color: "var(--accent, var(--violet-bright))", fontSize: 12, fontWeight: 700,
+                      fontFamily: "var(--font-body)",
+                      textDecoration: "underline", cursor: "pointer",
+                    }}
+                  >Retry</button>
                 )}
-                {value}
-              </div>
-              <div style={{ color: textMuted, fontSize: isPhone ? 10 : 11, marginTop: 4, letterSpacing: "0.08em", textTransform: "uppercase" as const }}>{label}</div>
-            </div>
-          ))}
+              </span>
+            }
+          />
+          <StatTile
+            label="Status"
+            live={!!matchFound}
+            value={matchFound ? "Found!" : pollFailures >= 3 ? "Reconnecting…" : "Searching"}
+          />
         </div>
+
+        {/* Reconnect note — after ≥3 consecutive poll failures; clears itself on success. */}
+        {pollFailures >= 3 && !matchFound && (
+          <div role="status" style={{
+            position: "relative", zIndex: 1,
+            padding: "8px 18px", borderRadius: 999,
+            background: "var(--coral-soft)",
+            border: "1px solid color-mix(in srgb, var(--coral) 35%, transparent)",
+            color: "var(--coral)",
+            fontSize: 13, fontWeight: 600, textAlign: "center",
+            maxWidth: "calc(100vw - 32px)",
+          }}>
+            Reconnecting to matchmaking… your squad is still in the queue.
+          </div>
+        )}
 
         {/* Queue signal — informational only while the squad is already searching. */}
         <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
@@ -500,7 +569,7 @@ function MatchmakingInner() {
               padding: isShortPhone ? "10px 20px" : "14px 36px", borderRadius: 999,
               background: "linear-gradient(135deg, rgba(194,255,61,0.15), rgba(124,92,255,0.25))",
               color: limeText,
-              fontFamily: "var(--font-space-grotesk)", fontSize: 15, fontWeight: 700,
+              fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 14, fontWeight: 700,
               display: "flex", alignItems: "center", gap: 8, justifyContent: "center" as const,
               border: "1px solid var(--lime-border, rgba(194,255,61,0.35))",
               width: isPhone ? "100%" : undefined,
@@ -514,35 +583,20 @@ function MatchmakingInner() {
           </div>
         </div>
 
-        <button
+        <Button
           onClick={handleCancel}
-          disabled={cancelling}
-          onMouseEnter={() => setCancelHover(true)}
-          onMouseLeave={() => setCancelHover(false)}
-          style={{
-            position: "relative", zIndex: 1,
-            padding: "13px 40px", borderRadius: 999, background: cancelHover ? "var(--overlay-hover)" : "transparent",
-            border: cancelHover ? "1.5px solid var(--border-strong)" : "1.5px solid var(--border)",
-            color: cancelHover ? textPrimary : textMuted,
-            fontFamily: "var(--font-space-grotesk)", fontSize: 15, fontWeight: 500,
-            cursor: cancelling ? "not-allowed" : "pointer",
-            transition: "all .15s ease",
-            minWidth: 176,
-            width: isPhone ? "100%" : undefined,
-            whiteSpace: "nowrap" as const,
-            display: "inline-flex" as const,
-            alignItems: "center" as const,
-            justifyContent: "center" as const,
-          }}
+          loading={cancelling}
+          variant="ghost"
+          style={{ position: "relative", zIndex: 1, minWidth: 176, width: isPhone ? "100%" : undefined }}
         >
-          {cancelling ? "Cancelling…" : cancelError ? "Try cancel again" : "Cancel search"}
-        </button>
+          {cancelError ? "Try cancel again" : "Cancel search"}
+        </Button>
         {cancelError && (
           <div role="alert" style={{
             position: "relative",
             zIndex: 1,
             color: "var(--coral)",
-            fontFamily: "var(--font-space-grotesk)",
+            fontFamily: "var(--font-display, var(--font-space-grotesk))",
             fontSize: 13,
             fontWeight: 700,
             textAlign: "center",

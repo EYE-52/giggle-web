@@ -1,24 +1,13 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
+import { useFocusTrap, useBodyScrollLock } from "@/components/Modal";
 import { Icon } from "@/components/Icons";
 import { useViewport } from "@/components/useViewport";
-import { api, session, resolveCover, type PublicSquad, type SquadState, type SquadMemberState } from "@giggle/core";
-
-// Deterministic tasteful gradient fallback — same palette as SquadCard so the
-// preview banner reads as the same visual system as the card it opened from.
-const GRADIENTS = [
-  "radial-gradient(120% 90% at 20% 10%, rgba(255,92,138,0.55), transparent 55%), radial-gradient(120% 90% at 90% 80%, rgba(124,92,255,0.6), transparent 55%), linear-gradient(160deg, #2a1140, #0b0b0f)",
-  "radial-gradient(120% 90% at 80% 10%, rgba(92,140,255,0.5), transparent 55%), radial-gradient(120% 90% at 10% 90%, rgba(61,214,192,0.45), transparent 55%), linear-gradient(160deg, #10243a, #0b0b0f)",
-  "radial-gradient(120% 90% at 30% 20%, rgba(194,255,61,0.4), transparent 55%), radial-gradient(120% 90% at 80% 90%, rgba(124,92,255,0.55), transparent 55%), linear-gradient(160deg, #1a2a12, #0b0b0f)",
-  "radial-gradient(120% 90% at 70% 15%, rgba(255,176,32,0.45), transparent 55%), radial-gradient(120% 90% at 15% 85%, rgba(255,92,138,0.5), transparent 55%), linear-gradient(160deg, #2e1a10, #0b0b0f)",
-];
-function gradientFor(key: string): string {
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return GRADIENTS[h % GRADIENTS.length];
-}
+import { api, session, type PublicSquad, type SquadState, type SquadMemberState } from "@giggle/core";
+import { useTheme } from "@/components/useTheme";
+import { coverKind, coverBackground, coverInk, fallbackGradient } from "@/components/covers";
 
 const STATUS_LABEL: Record<string, string> = {
   idle: "Open",
@@ -52,6 +41,9 @@ export function SquadPreview({
   const [detailError, setDetailError] = useState<string | null>(null);
   const [closeHover, setCloseHover] = useState(false);
   const [btnHover, setBtnHover] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef);
+  useBodyScrollLock();
 
   // Fetch full detail (tags + members + joinPolicy). Fall back to the PublicSquad
   // fields while loading.
@@ -92,13 +84,16 @@ export function SquadPreview({
   const isFull = memberCount >= maxSlots;
 
   const hasCover = !!squad.coverImage;
+  const themeId = useTheme();
+  // Photos always render dark-scrimmed; generated gradients follow the theme
+  // (bright pastel twins on light themes) — see components/covers.ts.
+  const kind = coverKind(squad.coverImage, themeId);
+  const ink = coverInk(kind);
   // Single CSS `background` value for the cover — real cover when set, else a
   // deterministic per-squad gradient so every card still has a distinct theme.
-  // (resolveCover returns a full `background` shorthand, incl. gradients, so we
-  // apply it directly rather than wrapping it in url().)
   const coverBg = hasCover
-    ? resolveCover(squad.coverImage)
-    : gradientFor(squad.squadId || squad.squadName);
+    ? coverBackground(squad.coverImage, kind)
+    : fallbackGradient(squad.squadId || squad.squadName, kind);
 
   const handleJoin = useCallback(async () => {
     setError(null);
@@ -146,6 +141,7 @@ export function SquadPreview({
       }}
     >
       <div
+        ref={cardRef}
         onClick={e => e.stopPropagation()}
         style={{
           position: "relative",
@@ -182,7 +178,7 @@ export function SquadPreview({
         {/* ── Banner header — the squad's cover, big + themed ──────── */}
         <div style={{
           position: "relative", height: 208, flexShrink: 0,
-          background: "#0b0b0f",
+          background: kind === "light" ? "#FFFFFF" : "#0b0b0f",
         }}>
           <div style={{
             position: "absolute", inset: 0,
@@ -191,7 +187,9 @@ export function SquadPreview({
           }} />
           {/* Richer scrim: melts into the surface at the bottom for the name, with
               a gentle top darkening so the status pill + close button stay legible. */}
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, var(--surface) 1%, rgba(7,7,11,0.78) 34%, rgba(7,7,11,0.28) 66%, rgba(7,7,11,0.42) 100%)" }} />
+          <div style={{ position: "absolute", inset: 0, background: kind === "light"
+            ? "linear-gradient(to top, var(--surface) 1%, rgba(255,255,255,0.78) 34%, rgba(255,255,255,0.24) 66%, rgba(255,255,255,0.38) 100%)"
+            : "linear-gradient(to top, var(--surface) 1%, rgba(7,7,11,0.78) 34%, rgba(7,7,11,0.28) 66%, rgba(7,7,11,0.42) 100%)" }} />
 
           {/* Status pill */}
           <div style={{
@@ -199,11 +197,11 @@ export function SquadPreview({
             display: "inline-flex", alignItems: "center", gap: 5,
             padding: "4px 9px", borderRadius: 999,
             background: "rgba(11,11,15,0.6)",
-            border: isLive ? "1px solid rgba(194,255,61,0.5)" : "1px solid rgba(255,255,255,0.18)",
+            border: isLive ? "1px solid rgba(183,255,42,0.5)" : "1px solid rgba(255,255,255,0.18)",
             backdropFilter: "blur(6px)",
           }}>
-            {isLive && <span style={{ width: 6, height: 6, borderRadius: 999, background: "#C2FF3D", boxShadow: "0 0 8px #C2FF3D" }} />}
-            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", color: isLive ? "#C2FF3D" : "#E7E7F0", textTransform: "uppercase" }}>{statusLabel}</span>
+            {isLive && <span style={{ width: 6, height: 6, borderRadius: 999, background: "#B7FF2A", boxShadow: "0 0 8px #B7FF2A" }} />}
+            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", color: isLive ? "#B7FF2A" : "#E7E7F0", textTransform: "uppercase" }}>{statusLabel}</span>
           </div>
 
           {/* Name + leader + member count */}
@@ -212,19 +210,19 @@ export function SquadPreview({
             <div style={{
               flexShrink: 0, width: 52, height: 52, borderRadius: 14,
               background: coverBg, backgroundSize: "cover", backgroundPosition: "center",
-              border: "2px solid rgba(255,255,255,0.16)",
+              border: kind === "light" ? "2px solid rgba(27,20,32,0.18)" : "2px solid rgba(255,255,255,0.16)",
               boxShadow: "0 6px 18px rgba(0,0,0,0.45)",
             }} />
             <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: "var(--font-space-grotesk)", fontWeight: 800, fontSize: 24, color: "#F4F4F7", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontFamily: "var(--font-space-grotesk)", fontWeight: 800, fontSize: 24, color: ink.text, letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {squad.squadName}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
-              <span style={{ fontSize: 13, color: "#C9C9DA" }}>
+              <span style={{ fontSize: 13, color: ink.textMuted }}>
                 {leaderName ? `Led by ${leaderName}` : "Open squad"}
               </span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, color: "#C9C9DA", fontWeight: 600 }}>
-                <Icon.account size={13} color="#C9C9DA" />
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, color: ink.textMuted, fontWeight: 600 }}>
+                <Icon.account size={13} color={ink.textMuted} />
                 <span style={{ fontVariantNumeric: "tabular-nums" }}>{memberCount}/{maxSlots}</span>
               </span>
             </div>
@@ -254,7 +252,7 @@ export function SquadPreview({
             display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 7,
             padding: "5px 12px", borderRadius: 999,
             background: isRequest ? "color-mix(in srgb, var(--amber, #FFB020) 14%, var(--surface))" : "var(--violet-soft)",
-            border: isRequest ? "1px solid color-mix(in srgb, var(--amber, #FFB020) 40%, transparent)" : "1px solid rgba(124,92,255,0.3)",
+            border: isRequest ? "1px solid color-mix(in srgb, var(--amber, #FFB020) 40%, transparent)" : "1px solid rgba(118,87,255,0.3)",
             color: isRequest ? "var(--amber, #FFB020)" : "var(--violet)",
             fontSize: 12.5, fontWeight: 700,
           }}>
@@ -371,7 +369,7 @@ export function SquadPreview({
                   background: isFull ? "var(--overlay)" : (btnHover ? "var(--violet-bright)" : "var(--violet)"),
                   color: isFull ? "var(--text-muted)" : "var(--on-accent)",
                   fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em",
-                  boxShadow: isFull ? "none" : (btnHover ? "0 0 36px -8px rgba(124,92,255,0.95)" : "0 0 24px -10px rgba(124,92,255,0.8)"),
+                  boxShadow: isFull ? "none" : (btnHover ? "0 0 36px -8px rgba(118,87,255,0.95)" : "0 0 24px -10px rgba(118,87,255,0.8)"),
                   display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
                   transform: !isFull && !joining && btnHover ? "translateY(-1px)" : "translateY(0)",
                   transition: "transform .14s ease, box-shadow .2s var(--ease-ui), background .2s var(--ease-ui)",

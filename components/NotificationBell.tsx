@@ -32,22 +32,17 @@ function relTime(iso: string): string {
 function typeStyle(type: NotificationType): { tint: string; icon: (s: number) => React.ReactNode } {
   switch (type) {
     case "friend_request":
-      return { tint: "#7C5CFF", icon: (s) => <Icon.users size={s} color="#fff" strokeWidth={2} /> };
+      return { tint: "var(--accent, var(--violet, #7657FF))", icon: (s) => <Icon.users size={s} color="#fff" strokeWidth={2} /> };
     case "squad_invite":
-      return { tint: "#38BDF8", icon: (s) => <Icon.users size={s} color="#fff" strokeWidth={2} /> };
+      return { tint: "var(--sky, #38BDF8)", icon: (s) => <Icon.users size={s} color="#fff" strokeWidth={2} /> };
     case "join_request":
-      return { tint: "#F59E0B", icon: (s) => <Icon.users size={s} color="#fff" strokeWidth={2} /> };
+      return { tint: "var(--amber, #F59E0B)", icon: (s) => <Icon.users size={s} color="#fff" strokeWidth={2} /> };
     case "squad_joined":
-      return { tint: "#C2FF3D", icon: (s) => <Icon.users size={s} color="#0b0b12" strokeWidth={2.2} /> };
+      return { tint: "var(--live, var(--lime, #B7FF2A))", icon: (s) => <Icon.users size={s} color="#0b0b12" strokeWidth={2.2} /> };
     default:
-      return { tint: "#9A9AB0", icon: (s) => <Icon.bell size={s} color="#fff" /> };
+      return { tint: "var(--text-muted, #9A9AB0)", icon: (s) => <Icon.bell size={s} color="#fff" /> };
   }
 }
-
-const REDUCED =
-  typeof window !== "undefined" && typeof window.matchMedia === "function"
-    ? () => window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    : () => false;
 
 // ── small action pill (matches app's tactile/focus conventions) ─────────────
 
@@ -100,7 +95,7 @@ function Pill({
         border,
         background: bg,
         color,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: 700,
         cursor: busy ? "default" : "pointer",
         opacity: busy ? 0.7 : 1,
@@ -240,7 +235,7 @@ function Row({
         display: "flex",
         gap: 11,
         padding: "12px 14px",
-        borderRadius: 12,
+        borderRadius: "var(--radius-control, 14px)",
         cursor: rowClickable ? "pointer" : "default",
         opacity: dim ? 0.55 : 1,
         transition: "opacity var(--dur) var(--ease-inout), background-color var(--dur) var(--ease-inout)",
@@ -296,7 +291,7 @@ function Row({
           <span
             style={{
               fontWeight: 700,
-              fontSize: 13.5,
+              fontSize: 13,
               color: "var(--text)",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -305,11 +300,11 @@ function Row({
           >
             {n.title}
           </span>
-          <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--text-muted)", flexShrink: 0 }}>
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
             {relTime(n.createdAt)}
           </span>
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4 }}>{n.body}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4 }}>{n.body}</div>
 
         {/* actions */}
         {!resolved && n.type === "friend_request" && (
@@ -352,10 +347,6 @@ function LiveToast({
 }) {
   const ts = typeStyle(n.type);
   useEffect(() => {
-    if (REDUCED()) {
-      const t = setTimeout(onClose, 5000);
-      return () => clearTimeout(t);
-    }
     const t = setTimeout(onClose, 5000);
     return () => clearTimeout(t);
   }, [n.id, onClose]);
@@ -383,7 +374,7 @@ function LiveToast({
         gap: 10,
         alignItems: "flex-start",
         padding: "12px 14px",
-        borderRadius: 14,
+        borderRadius: "var(--radius-control, 14px)",
         cursor: "pointer",
         background: "color-mix(in srgb, var(--surface) 88%, transparent)",
         backdropFilter: "blur(16px)",
@@ -449,10 +440,12 @@ export function NotificationBell() {
     }
   }, []);
 
-  // initial load + 45s poll fallback
+  // initial load + 45s poll fallback (skipped while the tab is hidden)
   useEffect(() => {
     void load();
-    const t = setInterval(() => void load(), 45000);
+    const t = setInterval(() => {
+      if (!document.hidden) void load();
+    }, 45000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -535,7 +528,7 @@ export function NotificationBell() {
         left: 0,
         right: 0,
         maxHeight: "calc(100vh - 64px)",
-        borderRadius: "0 0 18px 18px",
+        borderRadius: "0 0 var(--radius-tile, 16px) var(--radius-tile, 16px)",
       }
     : {
         position: "absolute",
@@ -543,7 +536,7 @@ export function NotificationBell() {
         right: 0,
         width: 380,
         maxHeight: "min(560px, calc(100vh - 96px))",
-        borderRadius: 16,
+        borderRadius: "var(--radius-tile, 16px)",
       };
 
   return (
@@ -564,19 +557,23 @@ export function NotificationBell() {
           alignItems: "center",
           justifyContent: "center",
           padding: 8,
-          minWidth: 44,
-          minHeight: 44,
-          width: 44,
-          height: 44,
-          borderRadius: 999,
+          // 38px rounded square on one baseline with the other TopNav
+          // controls; phone keeps the full 44px touch target.
+          minWidth: isPhone ? 44 : 38,
+          minHeight: isPhone ? 44 : 38,
+          width: isPhone ? 44 : 38,
+          height: isPhone ? 44 : 38,
+          borderRadius: 10,
           background: open || hover ? "var(--overlay-hover)" : "var(--overlay)",
-          border: open || hover ? "1px solid var(--border-strong)" : "1px solid var(--border)",
+          border: open || hover
+            ? "var(--border-w) solid var(--border-strong)"
+            : "var(--control-border)",
           cursor: "pointer",
           transition:
             "background-color var(--dur) var(--ease-inout), border-color var(--dur) var(--ease-inout), transform var(--dur) var(--ease-out)",
         }}
       >
-        <Icon.bell size={18} color={open || hover ? "var(--violet)" : "var(--text-muted)"} />
+        <Icon.bell size={18} color={open || hover ? "var(--accent, var(--violet))" : "var(--text-muted)"} />
         {badge && (
           <span
             aria-label={`${unread} unread`}
@@ -588,14 +585,14 @@ export function NotificationBell() {
               height: 16,
               padding: "0 4px",
               borderRadius: 999,
-              background: "var(--violet)",
+              background: "var(--accent, var(--violet))",
               color: "#fff",
               fontSize: 10,
               fontWeight: 800,
               lineHeight: "16px",
               textAlign: "center",
               boxShadow: "0 0 0 2px var(--bg)",
-              fontFamily: "var(--font-space-grotesk)",
+              fontFamily: "var(--font-display, var(--font-space-grotesk))",
             }}
           >
             {badge}
@@ -649,8 +646,8 @@ export function NotificationBell() {
                 style={{
                   border: "none",
                   background: "transparent",
-                  color: "var(--violet)",
-                  fontSize: 12.5,
+                  color: "var(--accent, var(--violet))",
+                  fontSize: 12,
                   fontWeight: 700,
                   cursor: "pointer",
                   padding: "4px 6px",
@@ -665,7 +662,7 @@ export function NotificationBell() {
           {/* list */}
           <div style={{ overflowY: "auto", padding: 6 }}>
             {panelError && (
-              <div role="alert" style={{ margin: "6px 8px 8px", color: "var(--coral)", fontSize: 12.5, fontWeight: 700 }}>
+              <div role="alert" style={{ margin: "6px 8px 8px", color: "var(--coral)", fontSize: 12, fontWeight: 700 }}>
                 {panelError}
               </div>
             )}
@@ -681,7 +678,7 @@ export function NotificationBell() {
                   <Icon.bell size={30} color="var(--text-muted)" />
                 </div>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>You&apos;re all caught up</div>
-                <div style={{ fontSize: 12.5, marginTop: 3 }}>New activity will show up here.</div>
+                <div style={{ fontSize: 12, marginTop: 3 }}>New activity will show up here.</div>
               </div>
             ) : (
               items.map((n) => <Row key={n.id} n={n} onResolve={onResolveRow} onDismiss={onDismissRow} />)

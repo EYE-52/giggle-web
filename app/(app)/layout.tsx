@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { TopNav } from "@/components/TopNav";
+import { ToastProvider } from "@/components/Toast";
+import { Logomark } from "@/components/Brand";
 import { useViewport } from "@/components/useViewport";
 import { session, connectSocket } from "@giggle/core";
 
@@ -40,28 +42,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [router]);
 
-  // Open the authenticated presence socket once for the app session so the user
+  // Open the authenticated presence socket for the app session so the user
   // counts as "online" app-wide (the backend marks online via the handshake).
-  // Not torn down on route changes — kept for the whole app session.
-  const presenceConnected = useRef(false);
+  // Not torn down on route changes — kept for the whole app session. Network
+  // drops auto-reconnect (socket.io); intentional client disconnects elsewhere
+  // (e.g. a page calling disconnectSocket) are re-opened here so presence
+  // resumes instead of latching offline for the rest of the session.
+  const reconnectTimer = useRef<number | null>(null);
   useEffect(() => {
-    if (presenceConnected.current) return;
-    if (authReady && session.isAuthed()) {
-      presenceConnected.current = true;
-      connectSocket();
-    }
+    if (!authReady || !session.isAuthed()) return;
+    const s = connectSocket();
+    const onDisconnect = (reason: string) => {
+      // socket.io retries every other reason on its own.
+      if (reason !== "io client disconnect") return;
+      if (reconnectTimer.current != null) window.clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = window.setTimeout(() => {
+        reconnectTimer.current = null;
+        if (session.isAuthed()) connectSocket();
+      }, 400);
+    };
+    s.on("disconnect", onDisconnect);
+    return () => {
+      s.off("disconnect", onDisconnect);
+      if (reconnectTimer.current != null) window.clearTimeout(reconnectTimer.current);
+    };
   }, [authReady]);
 
   if (!authReady) {
     return (
       <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--bg)", color: "var(--text-muted)", fontFamily: "var(--font-space-grotesk)", fontWeight: 700 }}>
-        Opening Giggle...
+        <div role="status" aria-live="polite" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <Logomark size={40} />
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span className="gg-spinner" aria-hidden="true" />
+            Opening Giggle...
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)", overflow: "hidden" }}>
+    <ToastProvider>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--app-bg, var(--bg))", overflow: "hidden" }}>
       {!isCalling && <a className="gg-skip-link" href="#main-content">Skip to content</a>}
       {!isCalling && <TopNav />}
       <main
@@ -92,10 +115,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {isCalling ? (
           children
         ) : (
+          // No per-pathname key: the entrance reveal runs once on mount instead
+          // of re-running on every route change.
           <div
-            key={pathname}
             style={{
-              animation: "fadeUp 0.32s var(--ease-out) both",
+              animation: "gg-reveal 0.32s var(--ease-out) both",
             }}
           >
             {children}
@@ -103,5 +127,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       </main>
     </div>
+    </ToastProvider>
   );
 }

@@ -7,6 +7,9 @@ import { AvatarPicker } from "@/components/AvatarPicker";
 import { Icon } from "@/components/Icons";
 import { billing, getMyAvatar, subscribeAvatar, session, DEFAULT_AVATAR_ID, api, type UserProfile } from "@giggle/core";
 import { useViewport } from "@/components/useViewport";
+import { Button } from "@/components/Button";
+import { Modal } from "@/components/Modal";
+import { Switch } from "@/components/Switch";
 
 const CURATED_VIBES = ["Gaming", "Music", "Chill", "Comedy", "Deep Talks", "Late Night", "Sports", "Art", "Study", "Hype", "Fitness", "Foodies"];
 const VIBE_STORAGE_KEY = "giggle.vibes";
@@ -86,20 +89,20 @@ export default function ProfilePage() {
   const router = useRouter();
   const { isPhone, isTablet } = useViewport();
 
-  const violet = "var(--violet)";
+  const violet = "var(--accent, var(--violet))";
   const coral = "var(--coral)";
   const textPrimary = "var(--text)";
   const textMuted = "var(--text-muted)";
   const textTertiary = "var(--text-dim)";
   const surface: React.CSSProperties = {
     background: "linear-gradient(160deg, var(--surface-grad-from) 0%, var(--surface-grad-to) 100%)",
-    border: "1px solid var(--border)",
-    borderRadius: 20,
-    padding: isPhone ? "16px 16px" : "20px 24px",
-    boxShadow: "var(--elev)",
+    border: "var(--control-border, 1px solid var(--border))",
+    borderRadius: "var(--radius-card, 20px)",
+    padding: isPhone ? 16 : 24,
+    boxShadow: "var(--shadow-card, var(--elev))",
   };
   const settingsSection: React.CSSProperties = {
-    padding: isPhone ? 16 : "20px 24px",
+    padding: isPhone ? 16 : 24,
     borderBottom: "1px solid var(--border)",
   };
   // Vibe preferences state (persisted to localStorage)
@@ -218,15 +221,18 @@ export default function ProfilePage() {
   const [savedDemo, setSavedDemo] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
   const [langInputFocus, setLangInputFocus] = useState(false);
-  const [saveDemoHover, setSaveDemoHover] = useState(false);
   const [ageFocus, setAgeFocus] = useState(false);
   const [countryFocus, setCountryFocus] = useState(false);
+  // True once the user edits any About-You field — a late-arriving fetch must
+  // not clobber in-progress edits (it still becomes the dirty-check baseline).
+  const demoTouchedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
     api.getMyProfile().then((p) => {
       if (!active) return;
       setLoadedProfile(p);
+      if (demoTouchedRef.current) return;
       setGender(p.gender ?? "");
       setAge(p.age != null ? String(p.age) : "");
       setLanguages(p.languages ?? []);
@@ -238,6 +244,7 @@ export default function ProfilePage() {
   function addLanguage(raw: string) {
     const lang = raw.trim();
     if (!lang) return;
+    demoTouchedRef.current = true;
     setLanguages((prev) => {
       if (prev.length >= MAX_LANGUAGES) return prev;
       if (prev.some((l) => l.toLowerCase() === lang.toLowerCase())) return prev;
@@ -246,8 +253,17 @@ export default function ProfilePage() {
     setLangDraft("");
   }
   function removeLanguage(lang: string) {
+    demoTouchedRef.current = true;
     setLanguages((prev) => prev.filter((l) => l !== lang));
   }
+
+  // Dirty check against the loaded profile — Save stays disabled until
+  // something actually changed (no fake "Saved" flash on a no-op).
+  const demoDirty =
+    gender !== (loadedProfile?.gender ?? "") ||
+    country.trim() !== (loadedProfile?.country ?? "") ||
+    age.trim() !== (loadedProfile?.age != null ? String(loadedProfile.age) : "") ||
+    JSON.stringify(languages) !== JSON.stringify(loadedProfile?.languages ?? []);
 
   async function saveDemographics() {
     setDemoError(null);
@@ -271,11 +287,7 @@ export default function ProfilePage() {
         body.age = n;
       }
     }
-    if (Object.keys(body).length === 0) {
-      setSavedDemo(true);
-      setTimeout(() => setSavedDemo(false), 1800);
-      return;
-    }
+    if (Object.keys(body).length === 0) return;
     setSavingDemo(true);
     try {
       const updated = await api.updateMyProfile(body);
@@ -284,6 +296,7 @@ export default function ProfilePage() {
       setAge(updated.age != null ? String(updated.age) : "");
       setLanguages(updated.languages ?? []);
       setCountry(updated.country ?? "");
+      demoTouchedRef.current = false;
       setSavedDemo(true);
       setTimeout(() => setSavedDemo(false), 1800);
     } catch (e) {
@@ -295,40 +308,17 @@ export default function ProfilePage() {
 
   // Hover states
   const [vibeTagHover, setVibeTagHover] = useState<string | null>(null);
-  const [addMoreHover, setAddMoreHover] = useState(false);
-  const [logOutHover, setLogOutHover] = useState(false);
   const [upgradeCardHover, setUpgradeCardHover] = useState(false);
   const [vibeChipHover, setVibeChipHover] = useState<string | null>(null);
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
 
   const SwitchRow = ({ label, desc, value, onChange }: { label: string; desc: string; value: boolean; onChange: (v: boolean) => void }) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--overlay)", gap: 12 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--border)", gap: 12 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: textPrimary, fontSize: 14, fontWeight: 600 }}>{label}</div>
         <div style={{ color: textTertiary, fontSize: 12, marginTop: 2 }}>{desc}</div>
       </div>
-      <button
-        onClick={() => onChange(!value)}
-        aria-label={label}
-        aria-pressed={value}
-        style={{
-          width: 44, height: 44, borderRadius: 999, border: "none", cursor: "pointer",
-          background: "transparent",
-          position: "relative", transition: "all .15s ease", flexShrink: 0,
-        }}
-      >
-        <div style={{
-          position: "absolute", top: 10, left: 0,
-          width: 44, height: 24, borderRadius: 12,
-          background: value ? violet : "var(--overlay-hover)",
-          transition: "background .15s ease",
-        }}>
-          <span style={{
-            position: "absolute", top: 3, left: value ? 23 : 3,
-            width: 18, height: 18, borderRadius: "50%", background: "#fff",
-            transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
-          }} />
-        </div>
-      </button>
+      <Switch checked={value} onChange={onChange} ariaLabel={label} />
     </div>
   );
 
@@ -340,8 +330,9 @@ export default function ProfilePage() {
   return (
     <>
     <div className="gg-reveal" style={outerGrid}>
-      {/* LEFT COLUMN — Avatar + Score + Stats */}
-      <div style={{ display: "flex", flexDirection: "column", gap: isPhone ? 14 : 16 }}>
+      {/* LEFT COLUMN — Avatar + Score + Stats. Sticky on desktop so the short
+          column tracks the (much taller) right column instead of leaving a void. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: isPhone ? 14 : 16, ...(isTablet ? {} : { position: "sticky", top: 24 }) }}>
         {/* Avatar card */}
         <div style={{ ...surface, display: "flex", flexDirection: "column", alignItems: "center", gap: 14, paddingTop: isPhone ? 22 : 26, paddingBottom: isPhone ? 18 : 22 }}>
           {/* Avatar — click to edit */}
@@ -349,6 +340,8 @@ export default function ProfilePage() {
             onClick={() => setPickerOpen(true)}
             onMouseEnter={() => setAvatarHover(true)}
             onMouseLeave={() => setAvatarHover(false)}
+            onFocus={() => setAvatarHover(true)}
+            onBlur={() => setAvatarHover(false)}
             aria-label="Edit avatar"
             style={{
               position: "relative", width: 120, height: 120,
@@ -356,13 +349,25 @@ export default function ProfilePage() {
               cursor: "pointer",
             }}
           >
-            <div style={{ position: "absolute", inset: 0, borderRadius: "50%", overflow: "hidden", border: avatarHover ? "3px solid var(--violet)" : "3px solid var(--border-strong)", transition: "border-color .16s ease" }}>
+            <div style={{ position: "absolute", inset: 0, borderRadius: "50%", overflow: "hidden", border: avatarHover ? "3px solid var(--accent, var(--violet))" : "3px solid var(--border-strong)", transition: "border-color .16s ease" }}>
               <AvatarArt value={myAvatar} size={114} />
+            </div>
+            {/* Persistent edit affordance — visible without hover (touch/keyboard) */}
+            <div aria-hidden style={{
+              position: "absolute", bottom: 4, left: 4, width: 24, height: 24,
+              borderRadius: "50%", background: "var(--surface-2)",
+              border: "1.5px solid var(--border-strong)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+            }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="var(--text-muted)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
             {/* Edit overlay */}
             <div style={{
               position: "absolute", inset: 0, borderRadius: "50%",
-              background: "rgba(11,11,15,0.5)",
+              background: "var(--overlay-strong)",
               display: "flex", alignItems: "center", justifyContent: "center",
               opacity: avatarHover ? 1 : 0,
               transition: "opacity 0.18s",
@@ -376,7 +381,7 @@ export default function ProfilePage() {
             {isPremium && (
               <div style={{
                 position: "absolute", bottom: 4, right: 4, width: 24, height: 24,
-                borderRadius: "50%", background: "#2563EB",
+                borderRadius: "50%", background: "var(--accent, var(--violet))",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 border: "2.5px solid var(--bg)",
               }}>
@@ -386,19 +391,19 @@ export default function ProfilePage() {
           </button>
           <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-              <h1 style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 22, fontWeight: 700, color: textPrimary, letterSpacing: "-0.02em", margin: 0 }}>{displayName}</h1>
+              <h1 style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 22, fontWeight: 700, color: textPrimary, letterSpacing: "-0.02em", margin: 0 }}>{displayName}</h1>
             </div>
           </div>
         </div>
 
         {/* Giggle+ status */}
         {isPremium ? (
-          <div style={{ ...surface, background: `linear-gradient(135deg, rgba(124,92,255,0.22) 0%, rgba(194,255,61,0.08) 100%)`, display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, var(--violet), var(--lime))`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Icon.star size={18} color="#0B0B0F" fill="#0B0B0F" />
+          <div style={{ ...surface, background: `linear-gradient(135deg, color-mix(in srgb, var(--accent, var(--violet)) 22%, transparent) 0%, color-mix(in srgb, var(--live, var(--lime)) 8%, transparent) 100%)`, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "var(--radius-control, 14px)", background: `linear-gradient(135deg, var(--accent, var(--violet)), var(--live, var(--lime)))`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon.star size={18} color="var(--live-contrast)" fill="var(--live-contrast)" />
           </div>
             <div>
-              <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 14, fontWeight: 700, color: textPrimary, letterSpacing: "-0.02em" }}>Giggle+ Active</div>
+              <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 17, fontWeight: 700, color: textPrimary, letterSpacing: "-0.02em" }}>Giggle+ Active</div>
               <div style={{ color: textMuted, fontSize: 12 }}>Premium member</div>
             </div>
           </div>
@@ -411,17 +416,17 @@ export default function ProfilePage() {
             style={{
               ...surface, cursor: "pointer",
               background: upgradeCardHover
-                ? "linear-gradient(135deg, rgba(124,92,255,0.32) 0%, var(--surface-grad-to) 100%)"
-                : "linear-gradient(135deg, rgba(124,92,255,0.22) 0%, var(--surface-grad-to) 100%)",
-              border: upgradeCardHover ? `1px solid rgba(124,92,255,0.4)` : "1px solid var(--border)",
+                ? "linear-gradient(135deg, color-mix(in srgb, var(--accent, var(--violet)) 32%, transparent) 0%, var(--surface-grad-to) 100%)"
+                : "linear-gradient(135deg, color-mix(in srgb, var(--accent, var(--violet)) 22%, transparent) 0%, var(--surface-grad-to) 100%)",
+              border: upgradeCardHover ? "1px solid color-mix(in srgb, var(--accent, var(--violet)) 40%, transparent)" : "var(--control-border, 1px solid var(--border))",
               display: "flex", alignItems: "center", justifyContent: "space-between",
               transition: "all .15s ease",
               transform: upgradeCardHover ? "translateY(-1px)" : "translateY(0)",
             }}
           >
             <div>
-              <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 15, fontWeight: 700, color: textPrimary, letterSpacing: "-0.02em" }}>Giggle+</div>
-              <div style={{ color: textMuted, fontSize: 13, marginTop: 2 }}>Monthly tokens + 15% pack bonus</div>
+              <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 17, fontWeight: 700, color: textPrimary, letterSpacing: "-0.02em" }}>Giggle+</div>
+              <div style={{ color: textMuted, fontSize: 13, marginTop: 2 }}>Monthly token stipend + 15% bonus tokens on packs</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{
@@ -439,7 +444,7 @@ export default function ProfilePage() {
         <div style={{ ...surface, padding: 0, overflow: "hidden" }}>
         {/* Vibe Preferences */}
         <section style={settingsSection}>
-          <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 18, fontWeight: 700, color: textPrimary, marginBottom: 14, letterSpacing: "-0.02em" }}>Vibe Preferences</div>
+          <h2 style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 22, fontWeight: 700, color: textPrimary, margin: "0 0 14px", letterSpacing: "-0.02em" }}>Vibe Preferences</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {vibes.map(t => (
               <button
@@ -449,10 +454,10 @@ export default function ProfilePage() {
                 onMouseLeave={() => setVibeTagHover(null)}
                 className="gg-press"
                 style={{
-                  background: vibeTagHover === t ? "color-mix(in srgb, var(--violet) 20%, transparent)" : "color-mix(in srgb, var(--violet) 13%, transparent)",
+                  background: vibeTagHover === t ? "color-mix(in srgb, var(--accent, var(--violet)) 20%, transparent)" : "color-mix(in srgb, var(--accent, var(--violet)) 13%, transparent)",
                   color: violet, borderRadius: 20, padding: "0 16px", minHeight: 44,
                   fontSize: 14, fontWeight: 500,
-                  border: `1px solid ${vibeTagHover === t ? "color-mix(in srgb, var(--violet) 53%, transparent)" : "color-mix(in srgb, var(--violet) 27%, transparent)"}`,
+                  border: `1px solid ${vibeTagHover === t ? "color-mix(in srgb, var(--accent, var(--violet)) 53%, transparent)" : "color-mix(in srgb, var(--accent, var(--violet)) 27%, transparent)"}`,
                   cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 6,
                   transition: "all .15s ease",
@@ -463,28 +468,19 @@ export default function ProfilePage() {
                 <Icon.close size={12} color={violet} />
               </button>
             ))}
-            <button
+            <Button
               onClick={() => setVibePickerOpen(true)}
-              onMouseEnter={() => setAddMoreHover(true)}
-              onMouseLeave={() => setAddMoreHover(false)}
-              className="gg-press"
-              style={{
-                border: addMoreHover ? `1.5px dashed ${textMuted}` : "1.5px dashed var(--text-dim)",
-                color: addMoreHover ? textMuted : textTertiary,
-                borderRadius: 20, padding: "0 16px", minHeight: 44, fontSize: 14, cursor: "pointer",
-                background: addMoreHover ? "var(--overlay)" : "transparent",
-                display: "flex", alignItems: "center", gap: 6,
-                transition: "all .15s ease",
-              }}
+              variant="tonal"
+              style={{ borderRadius: 20, fontSize: 14, fontWeight: 500, padding: "0 16px" }}
             >
-              <Icon.plus size={14} color={addMoreHover ? textMuted : textTertiary} />
+              <Icon.plus size={14} color={violet} />
               Add More
-            </button>
+            </Button>
           </div>
 
           {/* Curated vibe picker */}
           {vibePickerOpen && (
-            <div className="gg-toast" style={{ marginTop: 16, padding: "16px", background: "var(--overlay)", borderRadius: 14, border: "1px solid var(--border)" }}>
+            <div className="gg-toast" style={{ marginTop: 16, padding: 16, background: "var(--overlay)", borderRadius: "var(--radius-control, 14px)", border: "var(--control-border, 1px solid var(--border))" }}>
               <div style={{ color: textMuted, fontSize: 12, marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
                 <span>Pick vibes to add</span>
                 <button onClick={() => setVibePickerOpen(false)} aria-label="Close vibe picker" style={{ minWidth: 44, minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", color: textMuted, cursor: "pointer" }}>
@@ -505,11 +501,11 @@ export default function ProfilePage() {
                       style={{
                         borderRadius: 999, padding: "0 14px", minHeight: 44, fontSize: 13, fontWeight: 500,
                         border: `1.5px solid ${active || hovered ? violet : "var(--border-strong)"}`,
-                        background: active ? "color-mix(in srgb, var(--violet) 20%, transparent)" : hovered ? "color-mix(in srgb, var(--violet) 10%, transparent)" : "var(--overlay)",
+                        background: active ? "color-mix(in srgb, var(--accent, var(--violet)) 20%, transparent)" : hovered ? "color-mix(in srgb, var(--accent, var(--violet)) 10%, transparent)" : "var(--overlay)",
                         color: active || hovered ? violet : textMuted,
                         cursor: "pointer", transition: "all .15s ease",
                         transform: hovered && !active ? "translateY(-1px)" : "translateY(0)",
-                        boxShadow: hovered ? "0 0 12px -4px color-mix(in srgb, var(--violet) 40%, transparent)" : "none",
+                        boxShadow: hovered ? "0 0 12px -4px color-mix(in srgb, var(--accent, var(--violet)) 40%, transparent)" : "none",
                       }}
                     >
                       {vibe}
@@ -523,7 +519,7 @@ export default function ProfilePage() {
 
         {/* About you — demographics editor */}
         <section style={settingsSection}>
-          <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 18, fontWeight: 700, color: textPrimary, marginBottom: 4, letterSpacing: "-0.02em" }}>About You</div>
+          <h2 style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 22, fontWeight: 700, color: textPrimary, margin: "0 0 4px", letterSpacing: "-0.02em" }}>About You</h2>
           <div style={{ color: textMuted, fontSize: 13, marginBottom: 16 }}>Help us tailor your vibe matches.</div>
 
           {/* Gender — segmented control */}
@@ -535,12 +531,12 @@ export default function ProfilePage() {
                 return (
                   <button
                     key={opt.value}
-                    onClick={() => setGender(active ? "" : opt.value)}
+                    onClick={() => { demoTouchedRef.current = true; setGender(active ? "" : opt.value); }}
                     className="gg-press"
                     style={{
                       borderRadius: 999, padding: "0 14px", minHeight: 44, fontSize: 13, fontWeight: 600,
                       border: `1.5px solid ${active ? violet : "var(--border-strong)"}`,
-                      background: active ? "color-mix(in srgb, var(--violet) 20%, transparent)" : "var(--overlay)",
+                      background: active ? "color-mix(in srgb, var(--accent, var(--violet)) 20%, transparent)" : "var(--overlay)",
                       color: active ? violet : textMuted,
                       cursor: "pointer",
                       transition: "transform .14s ease, background .2s var(--ease-ui), border-color .2s var(--ease-ui), color .2s var(--ease-ui)",
@@ -562,14 +558,14 @@ export default function ProfilePage() {
                 min={13}
                 max={120}
                 value={age}
-                onChange={(e) => setAge(e.target.value)}
+                onChange={(e) => { demoTouchedRef.current = true; setAge(e.target.value); }}
                 onFocus={() => setAgeFocus(true)}
                 onBlur={() => setAgeFocus(false)}
                 placeholder="e.g. 24"
                 style={{
                   width: "100%", boxSizing: "border-box", minHeight: 44, padding: "10px 14px", fontSize: 14,
-                  borderRadius: 12, border: ageFocus ? "1px solid var(--violet)" : "1px solid var(--border-strong)",
-                  boxShadow: ageFocus ? "0 0 0 3px color-mix(in srgb, var(--violet) 30%, transparent)" : "none",
+                  borderRadius: "var(--radius-control, 14px)", border: ageFocus ? "1px solid var(--accent, var(--violet))" : "1px solid var(--border-strong)",
+                  boxShadow: ageFocus ? "0 0 0 3px color-mix(in srgb, var(--accent, var(--violet)) 30%, transparent)" : "none",
                   background: "var(--overlay)", color: textPrimary, outline: "none",
                   transition: "box-shadow .2s var(--ease-ui), border-color .2s var(--ease-ui)",
                 }}
@@ -578,14 +574,14 @@ export default function ProfilePage() {
             <div>
               <div style={{ color: textPrimary, fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Country</div>
               <select
-                value={COMMON_COUNTRIES.some((c) => c.code === country) ? country : ""}
-                onChange={(e) => setCountry(e.target.value)}
+                value={country}
+                onChange={(e) => { demoTouchedRef.current = true; setCountry(e.target.value); }}
                 onFocus={() => setCountryFocus(true)}
                 onBlur={() => setCountryFocus(false)}
                 style={{
                   width: "100%", boxSizing: "border-box", minHeight: 44, padding: "10px 14px", fontSize: 14,
-                  borderRadius: 12, border: countryFocus ? "1px solid var(--violet)" : "1px solid var(--border-strong)",
-                  boxShadow: countryFocus ? "0 0 0 3px color-mix(in srgb, var(--violet) 30%, transparent)" : "none",
+                  borderRadius: "var(--radius-control, 14px)", border: countryFocus ? "1px solid var(--accent, var(--violet))" : "1px solid var(--border-strong)",
+                  boxShadow: countryFocus ? "0 0 0 3px color-mix(in srgb, var(--accent, var(--violet)) 30%, transparent)" : "none",
                   background: "var(--overlay)", color: country ? textPrimary : textTertiary, outline: "none",
                   appearance: "none", cursor: "pointer",
                   transition: "box-shadow .2s var(--ease-ui), border-color .2s var(--ease-ui)",
@@ -595,6 +591,11 @@ export default function ProfilePage() {
                 {COMMON_COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>{c.flag} {c.label}</option>
                 ))}
+                {/* Loaded country outside the common list — keep it selectable so it
+                    displays and can't be silently wiped by the controlled select. */}
+                {country && !COMMON_COUNTRIES.some((c) => c.code === country) && (
+                  <option value={country}>{country}</option>
+                )}
               </select>
             </div>
           </div>
@@ -609,8 +610,8 @@ export default function ProfilePage() {
                 <span
                   key={lang}
                   style={{
-                    background: "color-mix(in srgb, var(--violet) 13%, transparent)", color: violet, borderRadius: 20, padding: "6px 12px",
-                    fontSize: 13, fontWeight: 500, border: "1px solid color-mix(in srgb, var(--violet) 27%, transparent)",
+                    background: "color-mix(in srgb, var(--accent, var(--violet)) 13%, transparent)", color: violet, borderRadius: 20, padding: "6px 12px",
+                    fontSize: 13, fontWeight: 500, border: "1px solid color-mix(in srgb, var(--accent, var(--violet)) 27%, transparent)",
                     display: "flex", alignItems: "center", gap: 6,
                   }}
                 >
@@ -632,13 +633,13 @@ export default function ProfilePage() {
                     if (e.key === "Enter") { e.preventDefault(); addLanguage(langDraft); }
                   }}
                   onFocus={() => setLangInputFocus(true)}
-                  onBlur={() => { setLangInputFocus(false); addLanguage(langDraft); }}
+                  onBlur={() => setLangInputFocus(false)}
                   placeholder="Add language + Enter"
                   style={{
                     flex: "1 1 140px", minWidth: 120, minHeight: 44, padding: "7px 12px", fontSize: 13,
                     borderRadius: 20, background: "var(--overlay)", color: textPrimary, outline: "none",
                     border: `1.5px dashed ${langInputFocus ? violet : "var(--border-strong)"}`,
-                    boxShadow: langInputFocus ? "0 0 0 3px color-mix(in srgb, var(--violet) 30%, transparent)" : "none",
+                    boxShadow: langInputFocus ? "0 0 0 3px color-mix(in srgb, var(--accent, var(--violet)) 30%, transparent)" : "none",
                     transition: "box-shadow .2s var(--ease-ui), border-color .2s var(--ease-ui)",
                   }}
                 />
@@ -651,28 +652,17 @@ export default function ProfilePage() {
           )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button
+            <Button
               onClick={saveDemographics}
-              disabled={savingDemo}
-              onMouseEnter={() => setSaveDemoHover(true)}
-              onMouseLeave={() => setSaveDemoHover(false)}
-              className="gg-press"
-              style={{
-                padding: "10px 24px", borderRadius: 999, border: "none", minHeight: 40,
-                cursor: savingDemo ? "default" : "pointer",
-                background: saveDemoHover && !savingDemo ? "var(--violet-bright)" : violet,
-                color: "var(--on-accent)", fontFamily: "var(--font-space-grotesk)",
-                fontSize: 14, fontWeight: 700, opacity: savingDemo ? 0.7 : 1,
-                transform: saveDemoHover && !savingDemo ? "translateY(-1px)" : "translateY(0)",
-                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
-                transition: "transform .14s ease, background .2s var(--ease-ui), box-shadow .2s var(--ease-ui)",
-              }}
+              loading={savingDemo}
+              disabled={!demoDirty}
+              style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 14 }}
             >
-              {savingDemo ? (<><span className="gg-spinner" /> Saving…</>) : "Save"}
-            </button>
+              {savingDemo ? "Saving…" : "Save"}
+            </Button>
             {savedDemo && (
-              <span className="gg-toast" style={{ color: "var(--lime)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden><path d="M2.5 7.5 6 11l5.5-7" stroke="var(--lime)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              <span className="gg-toast" style={{ color: "var(--lime-text)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden><path d="M2.5 7.5 6 11l5.5-7" stroke="var(--lime-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 Saved
               </span>
             )}
@@ -681,10 +671,10 @@ export default function ProfilePage() {
 
         {/* Account — the real, functional settings (privacy + notifications) */}
         <section ref={manageAccountRef} style={{ ...settingsSection, borderBottom: "none" }}>
-          <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 18, fontWeight: 700, color: textPrimary, marginBottom: 4, letterSpacing: "-0.02em" }}>Account</div>
+          <h2 style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 22, fontWeight: 700, color: textPrimary, margin: "0 0 4px", letterSpacing: "-0.02em" }}>Account</h2>
           {user?.email && (
             <div style={{ padding: "10px 0 14px", borderBottom: "1px solid var(--overlay)" }}>
-              <div style={{ color: textTertiary, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Signed in as</div>
+              <div style={{ color: textTertiary, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>Signed in as</div>
               <div style={{ color: textMuted, fontSize: 13, marginTop: 4, overflowWrap: "anywhere" }}>{user.email}</div>
             </div>
           )}
@@ -710,29 +700,29 @@ export default function ProfilePage() {
         </div>
 
         {/* Log Out */}
-        <button
-          onClick={() => { session.signOut(); router.push("/"); }}
-          onMouseEnter={() => setLogOutHover(true)}
-          onMouseLeave={() => setLogOutHover(false)}
-          className="gg-press"
+        <Button
+          onClick={() => setLogoutConfirm(true)}
+          variant="danger"
           style={{
             alignSelf: isPhone ? "stretch" : "flex-start",
-            padding: "13px 32px",
-            border: `1.5px solid ${logOutHover ? coral + "99" : coral + "55"}`,
-            borderRadius: 999,
-            background: logOutHover ? "color-mix(in srgb, var(--coral) 10%, transparent)" : "transparent",
-            color: coral,
-            fontFamily: "var(--font-space-grotesk)", fontSize: 15, fontWeight: 600, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            transform: logOutHover ? "translateY(-1px)" : "translateY(0)",
-            transition: "transform .14s ease, background .2s var(--ease-ui), border-color .2s var(--ease-ui)",
+            minHeight: 48,
+            padding: "0 32px",
+            fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 14, fontWeight: 600,
           }}
         >
           <Icon.enter size={18} color={coral} />
           Log Out
-        </button>
+        </Button>
       </div>
     </div>
+    {logoutConfirm && (
+      <Modal onClose={() => setLogoutConfirm(false)} title="Log out of Giggle?" subtitle="You can sign back in any time.">
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
+          <Button variant="ghost" onClick={() => setLogoutConfirm(false)}>Cancel</Button>
+          <Button variant="danger" onClick={() => { session.signOut(); router.push("/"); }}>Log out</Button>
+        </div>
+      </Modal>
+    )}
     {pickerOpen && <AvatarPicker current={myAvatar} onClose={() => setPickerOpen(false)} />}
     </>
   );

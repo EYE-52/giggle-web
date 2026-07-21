@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Space_Grotesk, Inter } from "next/font/google";
 import "./globals.css";
@@ -14,6 +14,13 @@ const inter = Inter({
   variable: "--font-inter",
   display: "swap",
 });
+
+// Explicit viewport export (Next 16 Metadata API: `viewport` object, not a
+// <meta> tag or metadata.viewport) — Safari must render 1:1 with Chrome.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "Giggle — Meet in squads",

@@ -7,12 +7,14 @@ import { Icon } from "@/components/Icons";
 import { ChatPanel } from "@/components/ChatPanel";
 import { CoverPicker } from "@/components/CoverPicker";
 import { InviteToSquad } from "@/components/InviteToSquad";
-import { api, connectSocket, SOCKET_EVENTS, session, resolveCover, getMyAvatar, subscribeAvatar, subscribeChat, joinChat, DEFAULT_AVATAR_ID } from "@giggle/core";
+import { Modal } from "@/components/Modal";
+import { Button } from "@/components/Button";
+import { Badge } from "@/components/Badge";
+import { api, connectSocket, SOCKET_EVENTS, session, getMyAvatar, subscribeAvatar, subscribeChat, joinChat, DEFAULT_AVATAR_ID } from "@giggle/core";
+import { coverKind, coverBackground, fallbackGradient } from "@/components/covers";
 import type { SquadState, JoinRequestUser } from "@giggle/core";
 import { createVideoClient } from "@giggle/agora";
 import { useViewport } from "@/components/useViewport";
-
-const avatarColors = ["#7C5CFF", "#3DD6C0", "#FF8A5C", "#C2FF3D"];
 
 const CURATED_VIBES = ["Gaming", "Music", "Chill", "Comedy", "Deep Talks", "Late Night", "Sports", "Art", "Study", "Hype", "Fitness", "Foodies"];
 
@@ -30,21 +32,6 @@ function normalizeVibeLabels(vibes: string[] = []) {
     if (normalized.length >= 5) break;
   }
   return normalized;
-}
-
-// Deterministic tasteful gradient fallback for squads with no cover set — gives
-// each one a distinct identity even before a cover is chosen. Same palette family
-// as SquadPreview so the two surfaces read as one visual system.
-const FALLBACK_GRADIENTS = [
-  "radial-gradient(120% 90% at 20% 10%, rgba(255,92,138,0.55), transparent 55%), radial-gradient(120% 90% at 90% 80%, rgba(124,92,255,0.6), transparent 55%), linear-gradient(160deg, #2a1140, #0b0b0f)",
-  "radial-gradient(120% 90% at 80% 10%, rgba(92,140,255,0.5), transparent 55%), radial-gradient(120% 90% at 10% 90%, rgba(61,214,192,0.45), transparent 55%), linear-gradient(160deg, #10243a, #0b0b0f)",
-  "radial-gradient(120% 90% at 30% 20%, rgba(194,255,61,0.4), transparent 55%), radial-gradient(120% 90% at 80% 90%, rgba(124,92,255,0.55), transparent 55%), linear-gradient(160deg, #1a2a12, #0b0b0f)",
-  "radial-gradient(120% 90% at 70% 15%, rgba(255,176,32,0.45), transparent 55%), radial-gradient(120% 90% at 15% 85%, rgba(255,92,138,0.5), transparent 55%), linear-gradient(160deg, #2e1a10, #0b0b0f)",
-];
-function fallbackGradient(key: string): string {
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return FALLBACK_GRADIENTS[h % FALLBACK_GRADIENTS.length];
 }
 
 // Translate a thrown ApiError / Agora error into a friendly, non-technical
@@ -136,6 +123,15 @@ function LobbyInner() {
   const [settingReady, setSettingReady] = useState(false);
   const [findingMatch, setFindingMatch] = useState(false);
   const [matchError, setMatchError] = useState<string | null>(null);
+  // Camera priming: confirm layer shown when finding a match with lobby media
+  // never enabled (we never auto-request permissions on mount).
+  const [noCamConfirmOpen, setNoCamConfirmOpen] = useState(false);
+  const [noCamEnabling, setNoCamEnabling] = useState(false);
+  // Poll-failure visibility: consecutive fetch failures (≥2) surface a small
+  // dismissible "connection trouble" banner; any success clears it.
+  const pollFailsRef = useRef(0);
+  const [connTrouble, setConnTrouble] = useState(false);
+  const [connTroubleDismissed, setConnTroubleDismissed] = useState(false);
   const [leavingSquad, setLeavingSquad] = useState(false);
 
   // Cover picker
@@ -231,23 +227,24 @@ function LobbyInner() {
   const [micHovered, setMicHovered] = useState(false);
   const [camHovered, setCamHovered] = useState(false);
   const [readyHovered, setReadyHovered] = useState(false);
-  const [findMatchHovered, setFindMatchHovered] = useState(false);
   const [editVibesHovered, setEditVibesHovered] = useState(false);
   const [changeCoverHovered, setChangeCoverHovered] = useState(false);
   const [boostHovered, setBoostHovered] = useState(false);
   const [copyCodeHovered, setCopyCodeHovered] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
-  const [vibeSaveHovered, setVibeSaveHovered] = useState(false);
-  const [vibeCancelHovered, setVibeCancelHovered] = useState(false);
   const [vibeChipHovered, setVibeChipHovered] = useState<string | null>(null);
 
-  const violet = "var(--violet)";
+  const violet = "var(--accent, var(--violet))";
   const lime = "var(--lime)";
   const limeText = "var(--lime-text)";
   const coral = "var(--coral)";
-  const textPrimary = "var(--text)";
-  const textMuted = "var(--text-muted)";
-  const textTertiary = "var(--text-dim)";
+  // ── ON-STAGE text tiers ─────────────────────────────────────────────────
+  // The lobby is "the studio": stage-dark in EVERY theme. These are pinned
+  // literals (not theme vars) so nothing inside the room flips with themes.
+  const textPrimary = "#F4F3F7";
+  const textMuted = "#C9C9DA";
+  const textTertiary = "#9A9AB0";
+  const ON_STAGE_HAIRLINE = "rgba(255,255,255,0.08)";
 
   async function fetchSquad() {
     if (!squadId) return;
@@ -261,11 +258,23 @@ function LobbyInner() {
       if (s.tags?.length) {
         setSelectedVibes(normalizeVibeLabels(s.tags));
       }
+      pollSucceeded();
     } catch (e) {
       console.error("getSquad failed:", e);
+      pollFailed();
     } finally {
       setLoading(false);
     }
+  }
+
+  function pollSucceeded() {
+    pollFailsRef.current = 0;
+    setConnTrouble(false);
+    setConnTroubleDismissed(false);
+  }
+  function pollFailed() {
+    pollFailsRef.current += 1;
+    if (pollFailsRef.current >= 2) setConnTrouble(true);
   }
 
   async function enableLobbyMedia() {
@@ -425,8 +434,10 @@ function LobbyInner() {
     try {
       const { requests } = await api.joinRequests(squadId);
       setJoinReqs(requests ?? []);
+      pollSucceeded();
     } catch (e) {
       console.error("joinRequests failed:", e);
+      pollFailed();
     }
   }
 
@@ -513,6 +524,17 @@ function LobbyInner() {
       setMatchError("Everyone needs to be ready before you find a match.");
       return;
     }
+    // Camera priming: if lobby media was never enabled, confirm before entering
+    // the encounter camera-less (never auto-request on mount).
+    if (!videoJoined) {
+      setNoCamConfirmOpen(true);
+      return;
+    }
+    await proceedFindMatch();
+  }
+
+  async function proceedFindMatch() {
+    if (!squadId) return;
     setFindingMatch(true);
     setMatchError(null);
     try {
@@ -594,7 +616,7 @@ function LobbyInner() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 400, color: textMuted, fontSize: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 400, color: "var(--text-muted)", fontSize: 14 }}>
         Loading lobby…
       </div>
     );
@@ -609,7 +631,7 @@ function LobbyInner() {
           borderRadius: 24,
           border: "1px solid var(--border)",
           background: "linear-gradient(135deg, color-mix(in srgb, var(--violet) 12%, var(--surface)) 0%, var(--surface) 58%, color-mix(in srgb, var(--lime) 8%, var(--surface)) 100%)",
-          boxShadow: "var(--elev)",
+          boxShadow: "var(--shadow-card, var(--elev))",
           padding: isPhone ? 22 : 28,
           textAlign: "center",
         }}>
@@ -625,45 +647,15 @@ function LobbyInner() {
           }}>
             <Icon.users size={25} color={violet} />
           </div>
-          <h1 style={{ margin: 0, color: textPrimary, fontFamily: "var(--font-space-grotesk)", fontSize: isPhone ? 26 : 30, lineHeight: 1.08, letterSpacing: "-0.02em" }}>
+          <h1 style={{ margin: 0, color: "var(--text)", fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: isPhone ? 26 : 30, lineHeight: 1.08, letterSpacing: "-0.02em" }}>
             This lobby link is no longer active
           </h1>
-          <p style={{ margin: "10px auto 0", maxWidth: 410, color: textMuted, fontSize: 14.5, lineHeight: 1.5 }}>
+          <p style={{ margin: "10px auto 0", maxWidth: 410, color: "var(--text-muted)", fontSize: 14, lineHeight: 1.5 }}>
             The squad may have ended, changed, or been opened from an old invite. Start fresh or browse live squads.
           </p>
           <div style={{ display: "flex", flexDirection: isPhone ? "column" : "row", justifyContent: "center", gap: 10, marginTop: 22 }}>
-            <button
-              onClick={() => router.push("/home")}
-              className="gg-press"
-              style={{
-                minHeight: 44,
-                borderRadius: 999,
-                border: "none",
-                background: violet,
-                color: "#fff",
-                fontWeight: 800,
-                padding: "0 20px",
-                cursor: "pointer",
-              }}
-            >
-              Go home
-            </button>
-            <button
-              onClick={() => router.push("/discover")}
-              className="gg-press"
-              style={{
-                minHeight: 44,
-                borderRadius: 999,
-                border: "1px solid var(--border)",
-                background: "var(--overlay)",
-                color: textPrimary,
-                fontWeight: 800,
-                padding: "0 20px",
-                cursor: "pointer",
-              }}
-            >
-              Browse squads
-            </button>
+            <Button onClick={() => router.push("/home")} variant="primary">Go home</Button>
+            <Button onClick={() => router.push("/discover")} variant="secondary">Browse squads</Button>
           </div>
         </div>
       </div>
@@ -677,9 +669,14 @@ function LobbyInner() {
   // a deterministic per-squad gradient so the squad still feels themed. Both
   // resolve to a CSS `background` value ready for inline styles.
   const hasCover = !!squad.coverImage;
+  // The lobby stage is dark in EVERY theme, so covers ALWAYS render in their
+  // dark variant here (never the bright pastel twins light themes use on the
+  // dashboard) — otherwise light themes get white scrims + pastel gradients
+  // bleeding into the dark room.
+  const coverStyleKind = coverKind(squad.coverImage, "dark");
   const coverBg = hasCover
-    ? resolveCover(squad.coverImage)
-    : fallbackGradient(squad.squadId || squad.squadName);
+    ? coverBackground(squad.coverImage, coverStyleKind)
+    : fallbackGradient(squad.squadId || squad.squadName, coverStyleKind);
   // Small reusable cover thumbnail (used by the header + Squad Info panel).
   const coverThumb = (size: number) => (
     <div style={{
@@ -707,6 +704,11 @@ function LobbyInner() {
 
   const allReady = memberCount > 0 && readyCount === memberCount;
   const myReady = !!myMember?.ready;
+  // Who's holding up the match — for the "waiting on…" helper under Find a Match.
+  const notReadyNames = (squad?.members ?? []).filter(m => !m.ready).map(m => m.displayName);
+  const notReadyLabel = notReadyNames.length <= 2
+    ? notReadyNames.join(", ")
+    : `${notReadyNames.slice(0, 2).join(", ")} +${notReadyNames.length - 2}`;
 
   // ── Reusable surfaces (shared by phone sheet + expanded desktop panel) ──
   const infoCard = (
@@ -719,10 +721,10 @@ function LobbyInner() {
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {coverThumb(38)}
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 14, fontWeight: 800, color: textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 14, fontWeight: 700, color: textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {squad.squadName}
           </div>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: textTertiary, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>Squad Info</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: textTertiary, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>Squad Info</div>
         </div>
       </div>
 
@@ -733,7 +735,13 @@ function LobbyInner() {
         ].map(row => (
           <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ color: textTertiary, fontSize: 12 }}>{row.label}</span>
-            <span style={{ color: row.color, fontSize: 12, fontWeight: 600 }}>{row.value}</span>
+            <span
+              role={row.label === "Ready" ? "status" : undefined}
+              aria-live={row.label === "Ready" ? "polite" : undefined}
+              style={{ color: row.color, fontSize: 12, fontWeight: 600 }}
+            >
+              {row.value}
+            </span>
           </div>
         ))}
 
@@ -742,8 +750,8 @@ function LobbyInner() {
           aria-expanded={settingsOpen}
           style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: "0 2px", border: "none", borderTop: "1px solid var(--border)", background: "transparent", color: textPrimary, cursor: "pointer" }}
         >
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700 }}><Icon.settings size={14} color={textMuted} /> Room settings</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: textTertiary, fontSize: 10.5 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 700 }}><Icon.settings size={14} color={textMuted} /> Room settings</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: textTertiary, fontSize: 12 }}>
             {visibility === "open" ? "Open" : "Private"} · {joinPolicy === "request" ? "Approval" : joinPolicy === "invite" ? "Invite only" : "Instant join"}
             <span style={{ transform: settingsOpen ? "rotate(90deg)" : "none", display: "flex" }}><Icon.chevron size={14} color={textMuted} /></span>
           </span>
@@ -755,8 +763,8 @@ function LobbyInner() {
             onClick={() => { setVibeEditorOpen(true); setSelectedVibes(normalizeVibeLabels(currentTags)); }}
             style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: "0 2px", border: "none", borderTop: "1px solid var(--border)", background: "transparent", color: textPrimary, cursor: "pointer" }}
           >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700 }}><Icon.settings size={14} color={textMuted} /> Edit vibes</span>
-            <span style={{ maxWidth: "55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: textTertiary, fontSize: 10.5 }}>{currentTags.join(" · ") || "None set"}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 700 }}><Icon.settings size={14} color={textMuted} /> Edit vibes</span>
+            <span style={{ maxWidth: "55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: textTertiary, fontSize: 12 }}>{currentTags.join(" · ") || "None set"}</span>
           </button>
         )}
         {/* Visibility toggle */}
@@ -768,8 +776,8 @@ function LobbyInner() {
               <button key={v} onClick={() => handleVisibility(v)} disabled={!isLeader || savingVisibility} style={{
                 minHeight: 44, padding: "0 12px", borderRadius: 999, border: "none",
                 cursor: isLeader && !savingVisibility ? "pointer" : "not-allowed",
-                fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
-                background: visibility === v ? (v === "open" ? "var(--lime)" : "var(--violet)") : "transparent",
+                fontSize: 12, fontWeight: 700, letterSpacing: "0.04em",
+                background: visibility === v ? (v === "open" ? "var(--lime)" : "var(--accent, var(--violet))") : "transparent",
                 color: visibility === v ? (v === "open" ? "#0B0B0F" : "#fff") : textTertiary,
                 transition: "all 0.15s",
               }}>
@@ -779,12 +787,12 @@ function LobbyInner() {
           </div>
         </div>
         {!isLeader && (
-          <div style={{ fontSize: 11, color: textTertiary, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: textTertiary, lineHeight: 1.5 }}>
             Only the squad leader can change visibility.
           </div>
         )}
         {visibility === "open" && (
-          <div style={{ fontSize: 11, color: textTertiary, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: textTertiary, lineHeight: 1.5 }}>
             Open lets strangers fill empty slots — find more matches.
           </div>
         )}
@@ -798,8 +806,8 @@ function LobbyInner() {
                 <button key={v} onClick={() => handleJoinPolicy(v)} disabled={savingJoinPolicy} style={{
                   minHeight: 44, padding: "0 12px", borderRadius: 999, border: "none",
                   cursor: savingJoinPolicy ? "not-allowed" : "pointer",
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
-                  background: joinPolicy === v ? (v === "open" ? "var(--lime)" : "var(--violet)") : "transparent",
+                  fontSize: 12, fontWeight: 700, letterSpacing: "0.04em",
+                  background: joinPolicy === v ? (v === "open" ? "var(--lime)" : "var(--accent, var(--violet))") : "transparent",
                   color: joinPolicy === v ? (v === "open" ? "#0B0B0F" : "#fff") : textTertiary,
                   transition: "all 0.15s",
                 }}>
@@ -808,18 +816,18 @@ function LobbyInner() {
               ))}
             </div>
           ) : (
-            <span style={{ fontSize: 11, fontWeight: 700, color: joinPolicy === "open" ? limeText : violet }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: joinPolicy === "open" ? limeText : violet }}>
               {joinPolicy === "open" ? "Open" : joinPolicy === "request" ? "Request" : "Invite-only"}
             </span>
           )}
         </div>
         {isLeader && (
-          <div style={{ fontSize: 11, color: textTertiary, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: textTertiary, lineHeight: 1.5 }}>
             Open: anyone can join instantly. Request: you approve who joins. Invite-only: only people you invite can join.
           </div>
         )}
         {isLeader && joinPolicy === "invite" && (
-          <div style={{ fontSize: 11, color: violet, lineHeight: 1.5, fontWeight: 600 }}>
+          <div style={{ fontSize: 12, color: violet, lineHeight: 1.5, fontWeight: 600 }}>
             Share your invite code below to bring people in — it's the only way to join this squad.
           </div>
         )}
@@ -833,16 +841,13 @@ function LobbyInner() {
           paddingTop: 12, borderTop: "1px solid var(--border)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 11, fontWeight: 700, color: textPrimary, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
+            <span style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 12, fontWeight: 700, color: textPrimary, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
               Join Requests
             </span>
-            <span style={{
-              fontSize: 9, fontWeight: 800, borderRadius: 999, padding: "1px 7px",
-              background: "var(--violet-soft)", color: violet, border: "1px solid var(--violet)",
-            }}>{joinReqs.length}</span>
+            <Badge tone="info" style={{ borderRadius: 999 }}>{joinReqs.length}</Badge>
           </div>
           {reqError && (
-            <div style={{ fontSize: 11, color: coral, lineHeight: 1.4 }}>{reqError}</div>
+            <div style={{ fontSize: 12, color: coral, lineHeight: 1.4 }}>{reqError}</div>
           )}
           {joinReqs.map((r, i) => {
             const dem = [
@@ -861,7 +866,7 @@ function LobbyInner() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
                   {dem && (
-                    <div style={{ fontSize: 10, color: textTertiary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dem}</div>
+                    <div style={{ fontSize: 12, color: textTertiary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dem}</div>
                   )}
                 </div>
                 <button
@@ -871,7 +876,7 @@ function LobbyInner() {
                   style={{
                     padding: "5px 10px", borderRadius: 8, border: "none",
                     cursor: busy ? "not-allowed" : "pointer",
-                    background: "var(--lime)", color: "#0B0B0F", fontSize: 11, fontWeight: 800,
+                    background: "var(--lime)", color: "#0B0B0F", fontSize: 12, fontWeight: 700,
                     opacity: busy ? 0.6 : 1, transition: "all .15s ease",
                   }}
                 >✓</button>
@@ -883,7 +888,7 @@ function LobbyInner() {
                     padding: "5px 10px", borderRadius: 8,
                     cursor: busy ? "not-allowed" : "pointer",
                     background: "transparent", border: "1px solid var(--coral-border, rgba(255,92,92,0.27))",
-                    color: coral, fontSize: 11, fontWeight: 800,
+                    color: coral, fontSize: 12, fontWeight: 700,
                     opacity: busy ? 0.6 : 1, transition: "all .15s ease",
                   }}
                 >×</button>
@@ -912,26 +917,21 @@ function LobbyInner() {
               {/* Presence dot: teal when online, muted grey when offline */}
               <span title={isOffline ? "Offline" : "Online"} style={{
                 width: 8, height: 8, borderRadius: 999, flexShrink: 0,
-                background: isOffline ? "var(--text-dim)" : "var(--lime)",
+                background: isOffline ? "var(--text-dim)" : "var(--live, var(--lime))",
                 boxShadow: isOffline ? "none" : "0 0 6px var(--lime)",
               }} />
               <Avatar name={member.displayName} size={28} colorIndex={i} />
               <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {member.displayName}
-                {isThisLeader && <span style={{ color: limeText, fontSize: 10, fontWeight: 700, marginLeft: 4 }}>★</span>}
+                {isThisLeader && <span style={{ color: violet, fontSize: 12, fontWeight: 700, marginLeft: 4 }}>★</span>}
                 {isOffline && (
-                  <span style={{ color: textTertiary, fontSize: 10, fontWeight: 600, marginLeft: 6 }}>Offline</span>
+                  <span style={{ color: textTertiary, fontSize: 12, fontWeight: 600, marginLeft: 6 }}>Offline</span>
                 )}
                 {dem && (
-                  <span style={{ color: textTertiary, fontSize: 10, fontWeight: 500, marginLeft: 6 }}>{dem}</span>
+                  <span style={{ color: textTertiary, fontSize: 12, fontWeight: 500, marginLeft: 6 }}>{dem}</span>
                 )}
               </span>
-              <span style={{
-                fontSize: 9, fontWeight: 700, borderRadius: 4, padding: "2px 6px",
-                background: member.ready ? "var(--lime-soft, rgba(194,255,61,0.09))" : "var(--overlay)",
-                color: member.ready ? limeText : textTertiary,
-                border: `1px solid ${member.ready ? "var(--lime-border, rgba(194,255,61,0.2))" : "var(--border)"}`,
-              }}>{member.ready ? "READY" : "WAIT"}</span>
+              <Badge tone={member.ready ? "live" : "full"}>{member.ready ? "READY" : "WAIT"}</Badge>
             </div>
           );
         })}
@@ -944,10 +944,10 @@ function LobbyInner() {
         onMouseLeave={() => setInvitePeopleHovered(false)}
         style={{
           minHeight: 44, padding: "0 14px", borderRadius: 12, cursor: "pointer",
-          background: invitePeopleHovered ? "var(--violet)" : "var(--violet-soft)",
+          background: invitePeopleHovered ? "var(--accent, var(--violet))" : "var(--violet-soft)",
           border: "1px solid var(--violet)",
           color: invitePeopleHovered ? "#fff" : violet,
-          fontFamily: "var(--font-space-grotesk)", fontSize: 12, fontWeight: 800,
+          fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 12, fontWeight: 700,
           display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
           transition: "all .15s ease",
         }}
@@ -965,7 +965,7 @@ function LobbyInner() {
         onMouseLeave={() => setBoostHovered(false)}
         style={{
           minHeight: 36, padding: "0 6px", border: "none", cursor: "pointer", background: "none",
-          color: boostHovered ? "var(--text)" : "var(--text-dim)",
+          color: boostHovered ? textPrimary : textTertiary,
           fontSize: 12, fontWeight: 600,
           display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
           transition: "color .15s ease",
@@ -983,11 +983,11 @@ function LobbyInner() {
       padding: 16,
       display: "flex", flexDirection: "column", gap: 10,
     }}>
-      <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 13, fontWeight: 700, color: textPrimary, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>Invite Code</div>
+      <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 13, fontWeight: 700, color: textPrimary, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>Invite Code</div>
       <div style={{
-        background: "var(--lime-soft, rgba(194,255,61,0.04))", border: "1px solid var(--lime-border, rgba(194,255,61,0.13))",
+        background: "var(--stage, #1B1420)", border: "1px solid rgba(255,255,255,0.12)",
         borderRadius: 10, padding: "10px 12px",
-        fontFamily: "monospace", fontSize: 22, fontWeight: 800, color: limeText,
+        fontFamily: "monospace", fontSize: 22, fontWeight: 700, color: "#F4F3F7",
         letterSpacing: "0.14em", textAlign: "center" as const,
       }}>
         {squad.squadCode}
@@ -1017,7 +1017,7 @@ function LobbyInner() {
   );
 
   const infoPanel = (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+    <div style={{ background: "var(--stage-2, #2A2135)", border: `1px solid ${ON_STAGE_HAIRLINE}`, borderRadius: 14, overflow: "hidden" }}>
       {infoCard}
       {inviteCard}
     </div>
@@ -1037,15 +1037,15 @@ function LobbyInner() {
       {/* Full calling layout: flex column filling viewport. The calling experience
           stays DARK in both themes (like every video app) so the stage and the
           floating side panel share one uniform background — no light/dark seam. */}
-      <div data-theme="dark" style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0B0B0F", overflow: "hidden" }}>
+      <div data-theme="dark" style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--stage, #1B1420)", overflow: "hidden" }}>
 
         {/* ── COMPACT HEADER — themed with the squad's own cover ── */}
         <div style={{
           position: "relative",
           display: "flex", alignItems: "center", gap: 12,
           padding: isPhone ? "8px 10px" : "12px 20px",
-          background: "var(--surface)",
-          borderBottom: "1px solid var(--border)",
+          background: "var(--stage, #1B1420)",
+          borderBottom: `1px solid ${ON_STAGE_HAIRLINE}`,
           backdropFilter: "blur(12px)",
           flexShrink: 0,
           zIndex: 10,
@@ -1118,8 +1118,8 @@ function LobbyInner() {
                     height: 32, width: isPhone ? 140 : 200, boxSizing: "border-box",
                     padding: "0 12px", borderRadius: 9,
                     background: "var(--overlay)", border: "1px solid var(--violet)",
-                    color: textPrimary, fontFamily: "var(--font-space-grotesk)",
-                    fontSize: 15, fontWeight: 800, outline: "none",
+                    color: textPrimary, fontFamily: "var(--font-display, var(--font-space-grotesk))",
+                    fontSize: 14, fontWeight: 700, outline: "none",
                   }}
                 />
                 <button
@@ -1131,7 +1131,7 @@ function LobbyInner() {
                     width: 30, height: 30, borderRadius: 8, border: "none", flexShrink: 0,
                     cursor: savingName ? "not-allowed" : "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    background: "var(--violet)", color: "#fff", fontSize: 14, fontWeight: 900, lineHeight: 1,
+                    background: "var(--accent, var(--violet))", color: "#fff", fontSize: 14, fontWeight: 700, lineHeight: 1,
                   }}
                 >✓</button>
                 <button
@@ -1150,11 +1150,11 @@ function LobbyInner() {
             ) : (
               <>
                 {isLeader && isPhone ? (
-                  <button onClick={startRename} aria-label="Rename squad" style={{ maxWidth: "100%", padding: 0, border: 0, background: "transparent", fontFamily: "var(--font-space-grotesk)", fontSize: 15, fontWeight: 800, color: textPrimary, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}>
+                  <button onClick={startRename} aria-label="Rename squad" style={{ maxWidth: "100%", padding: 0, border: 0, background: "transparent", fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 14, fontWeight: 700, color: textPrimary, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}>
                     {squad.squadName}
                   </button>
                 ) : (
-                  <h1 style={{ maxWidth: "100%", fontFamily: "var(--font-space-grotesk)", fontSize: 17, fontWeight: 800, color: textPrimary, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <h1 style={{ maxWidth: "100%", fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 17, fontWeight: 700, color: textPrimary, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {squad.squadName}
                   </h1>
                 )}
@@ -1180,9 +1180,9 @@ function LobbyInner() {
               </>
             )}
             <span style={{
-              background: "var(--lime-soft, rgba(194,255,61,0.09))", color: limeText, border: "1px solid var(--lime-border, rgba(194,255,61,0.27))",
+              background: "rgba(255,255,255,0.08)", color: "#F4F3F7", border: "1px solid rgba(255,255,255,0.14)",
               borderRadius: 999, padding: "2px 10px", fontFamily: "monospace",
-              fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", flexShrink: 0,
+              fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", flexShrink: 0,
             }}>{squad.squadCode}</span>
           </div>
 
@@ -1191,7 +1191,7 @@ function LobbyInner() {
             {currentTags.slice(0, 3).map(tag => (
               <span key={tag} style={{
                 background: "var(--violet-soft)", color: violet, borderRadius: 999,
-                padding: "3px 10px", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+                padding: "3px 10px", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
               }}>{tag}</span>
             ))}
             {isLeader && !isNarrow && (
@@ -1204,7 +1204,7 @@ function LobbyInner() {
                   display: "flex", alignItems: "center", gap: 4,
                   background: editVibesHovered ? "var(--overlay-hover)" : "var(--overlay)",
                   border: "1.5px dashed var(--border-strong)",
-                  borderRadius: 999, padding: "3px 10px", fontSize: 11, color: textMuted,
+                  borderRadius: 999, padding: "3px 10px", fontSize: 12, color: textMuted,
                   cursor: "pointer", fontWeight: 500, whiteSpace: "nowrap",
                   transition: "all .15s ease",
                 }}
@@ -1253,7 +1253,7 @@ function LobbyInner() {
                 background: chatVisible
                   ? "var(--violet-soft)"
                   : (chatHovered ? "var(--overlay-hover)" : "var(--overlay)"),
-                border: `1px solid ${chatVisible ? "var(--violet)" : "var(--border)"}`,
+                border: `1px solid ${chatVisible ? "var(--accent, var(--violet))" : "var(--border)"}`,
                 color: chatVisible ? violet : textMuted, fontSize: 12, fontWeight: 600,
                 cursor: "pointer", transition: "all .15s ease",
               }}
@@ -1264,7 +1264,7 @@ function LobbyInner() {
                 <span style={{
                   position: "absolute", top: -3, right: -3,
                   minWidth: 8, height: 8, borderRadius: 999,
-                  background: "var(--coral)", border: "1.5px solid var(--surface)",
+                  background: "var(--coral)", border: "1.5px solid var(--stage, #1B1420)",
                 }} />
               )}
             </button>
@@ -1309,7 +1309,7 @@ function LobbyInner() {
           <div style={{
             flex: isPhone ? "0 0 auto" : 1, display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
-            background: "#0B0B0F",
+            background: "var(--stage-2, #2A2135)",
             position: "relative",
             padding: isPhone ? "10px 10px 12px" : "24px 24px 16px",
             minHeight: isPhone ? 320 : 0,
@@ -1338,21 +1338,53 @@ function LobbyInner() {
                 position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
                 zIndex: 30, maxWidth: "calc(100% - 24px)",
                 display: "flex", alignItems: "center", gap: 10,
-                background: "var(--surface)",
-                border: "1px solid var(--coral)",
+                background: "var(--stage-2, #2A2135)",
+                backgroundImage: "linear-gradient(var(--coral-soft), var(--coral-soft))",
+                border: "1px solid color-mix(in srgb, var(--coral) 38%, transparent)",
                 borderRadius: 12, padding: "9px 12px 9px 14px",
                 boxShadow: "0 8px 28px rgba(0,0,0,0.35)",
               }}>
                 <span style={{
                   width: 7, height: 7, borderRadius: 999, background: coral, flexShrink: 0,
                 }} />
-                <span style={{ fontSize: 13, fontWeight: 500, color: textPrimary, lineHeight: 1.4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--coral)", lineHeight: 1.4 }}>
                   {videoError}
                 </span>
                 <button
                   onClick={() => setVideoError(null)}
                   title="Dismiss"
                   aria-label="Dismiss"
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: textMuted, fontSize: 16, lineHeight: 1, padding: "0 2px",
+                    display: "flex", alignItems: "center",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            {/* Poll-failure banner — shown after ≥2 consecutive fetch failures */}
+            {connTrouble && !connTroubleDismissed && (
+              <div role="status" style={{
+                position: "absolute", top: videoError ? 64 : 12, left: "50%", transform: "translateX(-50%)",
+                zIndex: 30, maxWidth: "calc(100% - 24px)",
+                display: "flex", alignItems: "center", gap: 10,
+                background: "var(--stage-2, #2A2135)",
+                border: "1px solid color-mix(in srgb, var(--amber) 45%, transparent)",
+                borderRadius: 12, padding: "9px 12px 9px 14px",
+                boxShadow: "0 8px 28px rgba(0,0,0,0.35)",
+              }}>
+                <span style={{
+                  width: 7, height: 7, borderRadius: 999, background: "var(--amber)", flexShrink: 0,
+                }} />
+                <span style={{ fontSize: 13, fontWeight: 500, color: textPrimary, lineHeight: 1.4 }}>
+                  Connection trouble — retrying…
+                </span>
+                <button
+                  onClick={() => setConnTroubleDismissed(true)}
+                  title="Dismiss"
+                  aria-label="Dismiss connection notice"
                   style={{
                     background: "none", border: "none", cursor: "pointer",
                     color: textMuted, fontSize: 16, lineHeight: 1, padding: "0 2px",
@@ -1378,7 +1410,7 @@ function LobbyInner() {
                   animation: "readyGlow 2.5s ease-in-out infinite",
                 }} />
                 <span style={{
-                  fontFamily: "var(--font-space-grotesk)", fontSize: 12.5, fontWeight: 600,
+                  fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 13, fontWeight: 600,
                   letterSpacing: "0.04em",
                   background: "linear-gradient(90deg, #C9C9DA 0%, #C9C9DA 38%, #F4F4F7 50%, #C9C9DA 62%, #C9C9DA 100%)",
                   backgroundSize: "220% auto",
@@ -1411,7 +1443,7 @@ function LobbyInner() {
               //   control bar below always stays on-screen.
               gridTemplateRows: `repeat(${effRows}, ${isPhone ? "auto" : "minmax(0, 1fr)"})`,
               ...(isPhone ? { flexShrink: 0 } : { flex: 1 }),
-              gap: 12,
+              gap: 16,
               width: "100%",
               maxWidth: effCols <= 1 ? 720 : effCols >= 4 ? 1320 : 1180,
               margin: "0 auto",
@@ -1430,14 +1462,14 @@ function LobbyInner() {
                     key={member.memberId}
                     style={{
                       position: "relative",
-                      borderRadius: 16,
+                      borderRadius: "var(--radius-tile, 16px)",
                       overflow: "hidden",
                       // Desktop fills the grid cell; phone uses a fixed aspect ratio.
                       ...(isPhone ? { aspectRatio: "4 / 3" } : { height: "100%" }),
-                      background: `linear-gradient(145deg, ${avatarColors[i % 4]}22 0%, #0D0D12 100%)`,
+                      background: "var(--stage-2, #2A2135)",
                       border: isReady
-                        ? `2px solid #C2FF3D66`
-                        : "1.5px solid rgba(255,255,255,0.08)",
+                        ? "2px solid color-mix(in srgb, var(--live, #A3E635) 40%, transparent)"
+                        : "1px solid rgba(255,255,255,0.10)",
                       // delay baked into the shorthand — never mix `animation` with `animationDelay`
                       animation: isReady
                         ? `tileIn 0.35s ease ${i * 0.06}s forwards, readyGlow 2.5s ease-in-out ${i * 0.06}s infinite`
@@ -1461,7 +1493,8 @@ function LobbyInner() {
                       position: "absolute", inset: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       zIndex: 1,
-                      background: `radial-gradient(ellipse at center, ${avatarColors[i % 4]}18 0%, transparent 70%)`,
+                      // Flat --stage-2 tile (from the parent) — no cover/color
+                      // gradients behind the avatar; clean and even in all themes.
                       // Desaturate the avatar/backdrop for offline members.
                       ...(isOffline ? { filter: "grayscale(0.85)" } : null),
                     }}>
@@ -1489,8 +1522,10 @@ function LobbyInner() {
                     {isThisLeader && (
                       <span style={{
                         position: "absolute", top: 10, left: 10, zIndex: 4,
-                        background: "#C2FF3D", color: "#0B0B0F",
-                        fontSize: 9, fontWeight: 800, borderRadius: 6,
+                        background: "rgba(11,11,15,0.6)", backdropFilter: "blur(4px)",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                        color: "#F4F3F7",
+                        fontSize: 12, fontWeight: 700, borderRadius: 6,
                         padding: "2px 7px", letterSpacing: "0.08em",
                       }}>LEAD</span>
                     )}
@@ -1506,69 +1541,78 @@ function LobbyInner() {
                         <span style={{
                           background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
                           borderRadius: 6, padding: "3px 8px",
-                          fontFamily: "var(--font-space-grotesk)", fontSize: 12, fontWeight: 600,
+                          fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 12, fontWeight: 600,
                           color: "#F4F4F7",
                           maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         }}>
                           {member.displayName}{isMe ? " (You)" : ""}
                         </span>
                         {!isNarrow && isOffline && (
-                          <span style={{
-                            display: "flex", alignItems: "center", gap: 4,
-                            background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
-                            border: "1px solid rgba(255,255,255,0.14)",
-                            borderRadius: 999, fontSize: 9, fontWeight: 800,
-                            color: "#C9C9DA", padding: "2px 7px", letterSpacing: "0.06em",
-                          }}>
-                            <span style={{ width: 6, height: 6, borderRadius: 999, background: "#9A9AB0" }} />
-                            OFFLINE
-                          </span>
+                          <Badge tone="full" style={{ borderRadius: 999 }}>OFFLINE</Badge>
                         )}
                         {!isNarrow && isReady && (
-                          <span style={{
-                            background: "rgba(194,255,61,0.13)", border: "1px solid rgba(194,255,61,0.33)",
-                            borderRadius: 999, fontSize: 9, fontWeight: 800,
-                            color: "#C2FF3D", padding: "2px 6px", letterSpacing: "0.06em",
-                          }}>✓ READY</span>
+                          <Badge tone="live" style={{ borderRadius: 999 }}>READY</Badge>
+                        )}
+                        {!isNarrow && !isReady && !isOffline && (
+                          <Badge tone="full" style={{ borderRadius: 999 }}>NOT READY</Badge>
                         )}
                       </div>
                       <div style={{ display: isNarrow ? "none" : "flex", gap: 4 }}>
-                        {/* For the local user these are interactive toggles; for
-                            others they're read-only status indicators. */}
-                        {(() => {
-                          const on = isMe ? micOn : member.inLobbyVideo;
-                          const common: React.CSSProperties = {
-                            width: 44, height: 44, borderRadius: 999, border: "none", padding: 0,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            background: on ? "rgba(124,92,255,0.6)" : "rgba(255,92,92,0.55)",
-                          };
-                          const icon = <Icon.mic size={16} color={on ? "#fff" : "#FFD7D7"} />;
-                          return isMe ? (
-                            <button onClick={toggleMic} title={micOn ? "Mute mic" : "Unmute mic"}
-                              style={{ ...common, cursor: "pointer", transition: "transform .12s ease" }}
-                              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.9)")}
-                              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                            >{icon}</button>
-                          ) : <span style={common}>{icon}</span>;
-                        })()}
-                        {(() => {
-                          const on = isMe ? camOn : member.inLobbyVideo;
-                          const common: React.CSSProperties = {
-                            width: 44, height: 44, borderRadius: 999, border: "none", padding: 0,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            background: on ? "rgba(124,92,255,0.6)" : "rgba(255,92,92,0.55)",
-                          };
-                          const icon = <Icon.cam size={16} color={on ? "#fff" : "#FFD7D7"} />;
-                          return isMe ? (
-                            <button onClick={toggleCam} title={camOn ? "Turn off camera" : "Turn on camera"}
-                              style={{ ...common, cursor: "pointer", transition: "transform .12s ease" }}
-                              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.9)")}
-                              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                            >{icon}</button>
-                          ) : <span style={common}>{icon}</span>;
-                        })()}
+                        {isMe ? (
+                          /* Local user — real interactive mic/cam toggles. */
+                          <>
+                            {(() => {
+                              const common: React.CSSProperties = {
+                                width: 44, height: 44, borderRadius: "var(--radius-control, 14px)", border: "none", padding: 0,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                /* Neutral glass when on, coral when off — green is reserved for READY. */
+                                background: micOn ? "rgba(255,255,255,0.14)" : "color-mix(in srgb, var(--coral) 70%, transparent)",
+                                boxShadow: micOn ? "inset 0 0 0 1px rgba(255,255,255,0.18)" : "none",
+                              };
+                              return (
+                                <button onClick={toggleMic} title={micOn ? "Mute mic" : "Unmute mic"}
+                                  aria-label={micOn ? "Mute mic" : "Unmute mic"} aria-pressed={micOn}
+                                  style={{ ...common, cursor: "pointer", transition: "transform .12s ease" }}
+                                  onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.9)")}
+                                  onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                                ><Icon.mic size={16} color="#fff" /></button>
+                              );
+                            })()}
+                            {(() => {
+                              const common: React.CSSProperties = {
+                                width: 44, height: 44, borderRadius: "var(--radius-control, 14px)", border: "none", padding: 0,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                background: camOn ? "rgba(255,255,255,0.14)" : "color-mix(in srgb, var(--coral) 70%, transparent)",
+                                boxShadow: camOn ? "inset 0 0 0 1px rgba(255,255,255,0.18)" : "none",
+                              };
+                              return (
+                                <button onClick={toggleCam} title={camOn ? "Turn off camera" : "Turn on camera"}
+                                  aria-label={camOn ? "Turn off camera" : "Turn on camera"} aria-pressed={camOn}
+                                  style={{ ...common, cursor: "pointer", transition: "transform .12s ease" }}
+                                  onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.9)")}
+                                  onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                                ><Icon.cam size={16} color="#fff" /></button>
+                              );
+                            })()}
+                          </>
+                        ) : (
+                          /* Remote members: the backend only tells us whether
+                             they're in lobby video — show ONE honest "in call"
+                             indicator instead of two fake mic+cam icons. */
+                          <span
+                            title={member.inLobbyVideo ? "In lobby video" : "Not in lobby video"}
+                            aria-label={member.inLobbyVideo ? "In lobby video" : "Not in lobby video"}
+                            style={{
+                              width: 44, height: 44, borderRadius: "var(--radius-control, 14px)", border: "none", padding: 0,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              background: member.inLobbyVideo ? "rgba(124,92,255,0.6)" : "rgba(255,255,255,0.10)",
+                            }}
+                          >
+                            <Icon.cam size={16} color={member.inLobbyVideo ? "#fff" : "#9A9AB0"} />
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1585,8 +1629,8 @@ function LobbyInner() {
                   onMouseEnter={() => setInviteTileHovered(true)}
                   onMouseLeave={() => setInviteTileHovered(false)}
                   style={{
-                    borderRadius: 16,
-                    border: `1.5px dashed ${inviteTileHovered ? "var(--violet)" : "rgba(255,255,255,0.12)"}`,
+                    borderRadius: "var(--radius-tile, 16px)",
+                    border: `1.5px dashed ${inviteTileHovered ? "var(--accent, var(--violet))" : "rgba(255,255,255,0.12)"}`,
                     background: inviteTileHovered ? "var(--violet-soft)" : "rgba(255,255,255,0.015)",
                     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
                     boxSizing: "border-box",
@@ -1599,9 +1643,9 @@ function LobbyInner() {
                     animation: `tileIn 0.35s ease ${memberCount * 0.06}s forwards`,
                   }}
                 >
-                  <Icon.plus size={22} color={inviteTileHovered ? "var(--violet)" : "#9A9AB0"} />
-                  <div style={{ fontSize: 13, fontWeight: 600, color: inviteTileHovered ? "var(--violet)" : "#9A9AB0" }}>Invite a friend</div>
-                  <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{MAX_SLOTS - memberCount} {MAX_SLOTS - memberCount === 1 ? "spot" : "spots"} open</div>
+                  <Icon.plus size={22} color={inviteTileHovered ? "var(--accent, var(--violet))" : "#9A9AB0"} />
+                  <div style={{ fontSize: 13, fontWeight: 600, color: inviteTileHovered ? "var(--accent, var(--violet))" : "#9A9AB0" }}>Invite a friend</div>
+                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{MAX_SLOTS - memberCount} {MAX_SLOTS - memberCount === 1 ? "spot" : "spots"} open</div>
                 </div>
               )}
 
@@ -1613,7 +1657,7 @@ function LobbyInner() {
               background: "rgba(22,22,30,0.92)",
               backdropFilter: "blur(16px)",
               border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 999,
+              borderRadius: "var(--radius-card, 20px)",
               padding: isPhone ? "8px 10px" : "10px 16px",
               marginTop: isPhone ? 0 : 32,
               animation: "controlIn 0.4s ease 0.3s forwards",
@@ -1637,17 +1681,20 @@ function LobbyInner() {
                     title={micOn ? "Mute microphone" : "Unmute microphone"}
                     aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
                     aria-pressed={micOn}
+                    className="gg-press"
                     style={{
-                      width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: "pointer",
+                      width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: "var(--radius-control, 14px)", border: "none", cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
+                      /* On = neutral glass, off = coral. Green stays reserved for READY. */
                       background: micOn
-                        ? (micHovered ? "rgba(124,92,255,0.35)" : "rgba(124,92,255,0.2)")
-                        : (micHovered ? "rgba(255,92,92,0.35)" : "rgba(255,92,92,0.25)"),
+                        ? (micHovered ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.12)")
+                        : (micHovered ? "color-mix(in srgb, var(--coral) 90%, transparent)" : "var(--coral)"),
+                      boxShadow: micOn ? "inset 0 0 0 1px rgba(255,255,255,0.18)" : "none",
                       transition: "all .15s ease",
                       transform: micHovered ? "scale(1.08)" : "scale(1)",
                     }}
                   >
-                    <Icon.mic size={20} color={micOn ? "#7C5CFF" : "#FF5C5C"} />
+                    <Icon.mic size={20} color="#fff" />
                   </button>
                   <button
                     onClick={toggleCam}
@@ -1656,38 +1703,37 @@ function LobbyInner() {
                     title={camOn ? "Turn off camera" : "Turn on camera"}
                     aria-label={camOn ? "Turn off camera" : "Turn on camera"}
                     aria-pressed={camOn}
+                    className="gg-press"
                     style={{
-                      width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: "pointer",
+                      width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: "var(--radius-control, 14px)", border: "none", cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       background: camOn
-                        ? (camHovered ? "rgba(124,92,255,0.35)" : "rgba(124,92,255,0.2)")
-                        : (camHovered ? "rgba(255,92,92,0.35)" : "rgba(255,92,92,0.25)"),
+                        ? (camHovered ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.12)")
+                        : (camHovered ? "color-mix(in srgb, var(--coral) 90%, transparent)" : "var(--coral)"),
+                      boxShadow: camOn ? "inset 0 0 0 1px rgba(255,255,255,0.18)" : "none",
                       transition: "all .15s ease",
                       transform: camHovered ? "scale(1.08)" : "scale(1)",
                     }}
                   >
-                    <Icon.cam size={20} color={camOn ? "#7C5CFF" : "#FF5C5C"} />
+                    <Icon.cam size={20} color="#fff" />
                   </button>
                   <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.1)", margin: "0 2px" }} />
                 </>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flex: isPhone ? "1 0 100%" : undefined }}>
-                  <span style={{ maxWidth: 150, color: textMuted, fontSize: 11.5, lineHeight: 1.25 }}>
+                  <span style={{ maxWidth: 150, color: textMuted, fontSize: 12, lineHeight: 1.25 }}>
                     Used in this lobby and live encounters.
                   </span>
-                  <button
+                  <Button
                     onClick={enableLobbyMedia}
-                    disabled={videoJoining}
+                    loading={videoJoining}
+                    variant="secondary"
                     aria-label="Enable camera and microphone"
-                    style={{
-                      minHeight: 44, borderRadius: 999, border: "1px solid rgba(124,92,255,0.45)", padding: "0 14px",
-                      display: "inline-flex", alignItems: "center", gap: 7, cursor: videoJoining ? "wait" : "pointer",
-                      background: "rgba(124,92,255,0.18)", color: "#F4F4F7", fontWeight: 700, whiteSpace: "nowrap",
-                    }}
+                    style={{ whiteSpace: "nowrap" }}
                   >
-                    <Icon.cam size={17} color="#9278FF" />
-                    {videoJoining ? "Enabling..." : "Enable camera & mic"}
-                  </button>
+                    {!videoJoining && <Icon.cam size={17} color="var(--accent, var(--violet))" />}
+                    {videoJoining ? "Enabling…" : "Enable camera & mic"}
+                  </Button>
                 </div>
               )}
 
@@ -1698,56 +1744,66 @@ function LobbyInner() {
                 onMouseEnter={() => setReadyHovered(true)}
                 onMouseLeave={() => setReadyHovered(false)}
                 title="Toggle ready"
+                aria-pressed={myReady}
+                className="gg-press"
                 style={{
-                  height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: "pointer",
+                  height: isPhone ? 44 : 50, borderRadius: "var(--radius-btn, 999px)", border: "none", cursor: "pointer",
                   padding: "0 20px",
                   display: "flex", alignItems: "center", gap: 7,
-                  background: readyHovered ? "rgba(194,255,61,0.17)" : "rgba(194,255,61,0.09)",
-                  color: "#C2FF3D",
-                  fontWeight: 700, fontSize: 14,
+                  // v3 tonal button; filled --live when ready — an unambiguous "on" state.
+                  background: myReady
+                    ? "var(--live, var(--lime))"
+                    : readyHovered ? "var(--accent-line)" : "var(--accent-soft)",
+                  color: myReady ? "var(--live-contrast, #0B0B12)" : "var(--accent, var(--violet))",
+                  fontWeight: 600, fontSize: 14,
                   transition: "all .15s ease",
                   transform: readyHovered ? "scale(1.04)" : "scale(1)",
                   minWidth: 110,
                   whiteSpace: "nowrap" as const,
+                  boxShadow: myReady ? "0 0 20px -6px var(--live, var(--lime))" : "none",
                 }}
               >
-                {settingReady ? "…" : myReady ? "Ready" : "Mark ready"}
+                {settingReady ? "…" : myReady ? "✓ Ready" : "Mark ready"}
               </button>
 
               {/* Find a Match (leader only) */}
               {isLeader && (
                 <>
                   {!isPhone && <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.1)", margin: "0 2px" }} />}
-                  <button
+                  <Button
                     onClick={handleFindMatch}
-                    disabled={findingMatch || !allReady}
+                    disabled={!allReady}
+                    loading={findingMatch}
+                    variant="primary"
                     aria-label="Find a Match"
-                    onMouseEnter={() => setFindMatchHovered(true)}
-                    onMouseLeave={() => setFindMatchHovered(false)}
                     style={{
-                      height: isPhone ? 44 : 50, borderRadius: 999, border: "none", cursor: findingMatch || !allReady ? "not-allowed" : "pointer",
-                      padding: "0 28px",
-                      display: "flex", alignItems: "center", gap: 8,
-                      background: "var(--violet)",
-                      color: "#fff",
-                      fontFamily: "var(--font-space-grotesk)", fontSize: 15, fontWeight: 800,
-                      boxShadow: findMatchHovered
-                        ? "0 0 40px -4px var(--violet), 0 0 0 3px var(--violet-soft)"
-                        : "0 0 24px -6px var(--violet)",
-                      transition: "all .15s ease",
-                      transform: findMatchHovered ? "scale(1.04)" : "scale(1)",
+                      height: isPhone ? 44 : 50,
                       minWidth: isPhone ? 0 : 162,
                       flex: isPhone ? "1 0 100%" : undefined,
-                      whiteSpace: "nowrap" as const,
-                      opacity: allReady ? 1 : 0.56,
                     }}
                   >
-                    <Icon.discover size={18} color="#fff" />
+                    {!findingMatch && <Icon.discover size={18} color="var(--on-accent, #fff)" />}
                     {findingMatch ? "Starting…" : allReady ? "Find a Match" : "Waiting for everyone"}
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
+            {/* Why Find-a-Match is disabled — names of who we're waiting on */}
+            {isLeader && !allReady && memberCount > 0 && (
+              <div role="status" aria-live="polite" style={{
+                alignSelf: "center",
+                marginTop: 8,
+                maxWidth: isPhone ? "calc(100vw - 28px)" : 520,
+                fontSize: 12,
+                color: textMuted,
+                textAlign: "center" as const,
+                lineHeight: 1.4,
+                position: "relative" as const,
+                zIndex: 1,
+              }}>
+                {readyCount} of {memberCount} ready{notReadyNames.length > 0 ? ` — waiting on ${notReadyLabel}` : ""}
+              </div>
+            )}
             {matchError && (
               <div role="alert" className="gg-toast" style={{
                 alignSelf: "center",
@@ -1758,11 +1814,11 @@ function LobbyInner() {
                 gap: 8,
                 padding: "9px 12px",
                 borderRadius: 999,
-                background: "color-mix(in srgb, var(--coral) 12%, var(--surface))",
+                background: "var(--coral-soft)",
                 border: "1px solid color-mix(in srgb, var(--coral) 38%, transparent)",
                 color: "var(--coral)",
-                fontSize: 12.5,
-                fontWeight: 700,
+                fontSize: 13,
+                fontWeight: 600,
                 lineHeight: 1.25,
               }}>
                 <Icon.flag size={14} color="var(--coral)" />
@@ -1783,8 +1839,8 @@ function LobbyInner() {
               maxHeight: "45vh",
               display: "flex",
               flexDirection: "column",
-              background: "var(--surface)",
-              borderTop: "1px solid var(--border)",
+              background: "var(--stage-2, #2A2135)",
+              borderTop: `1px solid ${ON_STAGE_HAIRLINE}`,
               margin: 0,
               overflowY: "auto",
               padding: "12px 10px 20px",
@@ -1793,8 +1849,8 @@ function LobbyInner() {
               {infoPanel}
               {chatOpen && (
                 <div style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
+                  background: "var(--stage-2, #2A2135)",
+                  border: `1px solid ${ON_STAGE_HAIRLINE}`,
                   borderRadius: 16,
                   overflow: "hidden",
                   display: "flex", flexDirection: "column",
@@ -1824,8 +1880,8 @@ function LobbyInner() {
                   margin: "4px 0 12px 0",
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
                   padding: "12px 0",
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
+                  background: "var(--stage-2, #2A2135)",
+                  border: `1px solid ${ON_STAGE_HAIRLINE}`,
                   borderRadius: 18,
                   backdropFilter: "blur(12px)",
                   boxShadow: "0 8px 32px -12px rgba(0,0,0,0.45)",
@@ -1837,7 +1893,7 @@ function LobbyInner() {
                     <div style={{
                       minWidth: 38, padding: "5px 0", borderRadius: 999, textAlign: "center" as const,
                       background: "var(--violet-soft)", border: "1px solid var(--violet)",
-                      color: violet, fontSize: 12, fontWeight: 800, fontFamily: "var(--font-space-grotesk)",
+                      color: violet, fontSize: 12, fontWeight: 700, fontFamily: "var(--font-display, var(--font-space-grotesk))",
                     }}>{memberCount}/{MAX_SLOTS}</div>
                   </div>
 
@@ -1851,7 +1907,7 @@ function LobbyInner() {
                       border: `1.5px solid ${allReady ? "var(--lime)" : "var(--border-strong)"}`,
                       boxShadow: allReady ? "0 0 10px var(--lime)" : "none",
                     }} />
-                    <span style={{ fontSize: 10, fontWeight: 700, color: allReady ? limeText : textTertiary }}>{readyCount}/{memberCount}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: allReady ? limeText : textTertiary }}>{readyCount}/{memberCount}</span>
                   </div>
 
                   <div style={{ width: 28, height: 1, background: "var(--border)" }} />
@@ -1878,7 +1934,7 @@ function LobbyInner() {
                     }}
                   >
                     {codeCopied
-                      ? <span style={{ color: "#0B0B0F", fontSize: 16, fontWeight: 900, lineHeight: 1 }}>✓</span>
+                      ? <span style={{ color: "#0B0B0F", fontSize: 16, fontWeight: 700, lineHeight: 1 }}>✓</span>
                       : <Icon.copy size={16} color={textMuted} />}
                   </button>
 
@@ -1901,10 +1957,10 @@ function LobbyInner() {
                     {unread > 0 && (
                       <span style={{
                         position: "absolute", top: -3, right: -3,
-                        minWidth: 15, height: 15, padding: "0 3px", borderRadius: 999,
+                        minWidth: 18, height: 18, padding: "0 4px", borderRadius: 999,
                         background: "var(--coral)", color: "#fff",
-                        fontSize: 9, fontWeight: 800, lineHeight: "15px", textAlign: "center" as const,
-                        border: "1.5px solid var(--surface)",
+                        fontSize: 12, fontWeight: 700, lineHeight: "18px", textAlign: "center" as const,
+                        border: "1.5px solid var(--stage, #1B1420)",
                       }}>{unread > 9 ? "9+" : unread}</span>
                     )}
                   </button>
@@ -1952,9 +2008,9 @@ function LobbyInner() {
                           <button key={tab} onClick={() => setSidebarTab(tab)} style={{
                             position: "relative",
                             flex: 1, padding: "6px 0", borderRadius: 999, border: "none", cursor: "pointer",
-                            background: active ? "var(--violet)" : "transparent",
+                            background: active ? "var(--accent, var(--violet))" : "transparent",
                             color: active ? "#fff" : textMuted,
-                            fontSize: 12, fontWeight: 700, fontFamily: "var(--font-space-grotesk)",
+                            fontSize: 12, fontWeight: 700, fontFamily: "var(--font-display, var(--font-space-grotesk))",
                             transition: "all .15s ease",
                           }}>
                             {tab === "info" ? "Info" : "Chat"}
@@ -1993,8 +2049,8 @@ function LobbyInner() {
                   ) : (
                     <div style={{
                       flex: 1, minHeight: 0,
-                      background: "var(--surface)",
-                      border: "1px solid var(--border)",
+                      background: "var(--stage-2, #2A2135)",
+                      border: `1px solid ${ON_STAGE_HAIRLINE}`,
                       borderRadius: 16,
                       overflow: "hidden",
                       display: "flex", flexDirection: "column",
@@ -2010,6 +2066,46 @@ function LobbyInner() {
       </div>
 
       {/* ── MODALS ── */}
+      {noCamConfirmOpen && (
+        <Modal
+          onClose={() => { if (!noCamEnabling) setNoCamConfirmOpen(false); }}
+          title="Your camera is off"
+          subtitle="Others won't see you in the encounter."
+          ariaLabel="Camera is off confirmation"
+          width={400}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Button
+              fullWidth
+              loading={noCamEnabling || findingMatch}
+              onClick={async () => {
+                setNoCamEnabling(true);
+                try {
+                  await enableLobbyMedia();
+                } finally {
+                  setNoCamEnabling(false);
+                }
+                setNoCamConfirmOpen(false);
+                await proceedFindMatch();
+              }}
+            >
+              Enable camera
+            </Button>
+            <Button
+              fullWidth
+              variant="ghost"
+              disabled={noCamEnabling}
+              onClick={async () => {
+                setNoCamConfirmOpen(false);
+                await proceedFindMatch();
+              }}
+            >
+              Continue without camera
+            </Button>
+          </div>
+        </Modal>
+      )}
+
       {invitePeopleOpen && (
         <InviteToSquad
           squadId={squad.squadId}
@@ -2035,7 +2131,7 @@ function LobbyInner() {
         }} onClick={e => { if (e.target === e.currentTarget) setVibeEditorOpen(false); }}>
           <div style={{ background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: 24, padding: "32px 28px", width: isPhone ? "calc(100vw - 32px)" : 440, display: "flex", flexDirection: "column", gap: 20 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ fontFamily: "var(--font-space-grotesk)", fontSize: 18, fontWeight: 700, color: textPrimary }}>Edit Squad Vibes</div>
+              <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 18, fontWeight: 700, color: textPrimary }}>Edit Squad Vibes</div>
               <button onClick={() => setVibeEditorOpen(false)} style={{ background: "none", border: "none", color: textMuted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>
                 <Icon.close size={18} color={textMuted} />
               </button>
@@ -2096,7 +2192,7 @@ function LobbyInner() {
                         style={{
                           borderRadius: 999, padding: "7px 16px", fontSize: 14, fontWeight: 500,
                           cursor: active || selectedVibes.length < MAX_VIBES ? "pointer" : "not-allowed",
-                          border: `1.5px solid ${active ? "var(--violet)" : "var(--border-strong)"}`,
+                          border: `1.5px solid ${active ? "var(--accent, var(--violet))" : "var(--border-strong)"}`,
                           background: active ? "var(--violet-soft)" : "var(--overlay)",
                           color: active ? violet : textMuted,
                           transition: "all 0.15s",
@@ -2116,35 +2212,10 @@ function LobbyInner() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
               <span style={{ color: textTertiary, fontSize: 12 }}>{selectedVibes.length}/{MAX_VIBES} selected</span>
               <div style={{ display: "flex", gap: 10 }}>
-                <button
-                  onClick={() => setVibeEditorOpen(false)}
-                  onMouseEnter={() => setVibeCancelHovered(true)}
-                  onMouseLeave={() => setVibeCancelHovered(false)}
-                  style={{
-                    padding: "10px 20px", borderRadius: 999,
-                    background: vibeCancelHovered ? "var(--overlay-hover)" : "transparent",
-                    border: "1px solid var(--border)", color: textMuted, fontSize: 14,
-                    cursor: "pointer", transition: "all .15s ease",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveVibes}
-                  disabled={savingVibes}
-                  onMouseEnter={() => setVibeSaveHovered(true)}
-                  onMouseLeave={() => setVibeSaveHovered(false)}
-                  style={{
-                    padding: "10px 20px", borderRadius: 999, background: "var(--violet)", border: "none",
-                    color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
-                    boxShadow: vibeSaveHovered ? "0 0 32px -4px var(--violet)" : "0 0 20px -6px var(--violet)",
-                    transition: "all .15s ease",
-                    minWidth: 120,
-                    whiteSpace: "nowrap" as const,
-                  }}
-                >
+                <Button onClick={() => setVibeEditorOpen(false)} variant="ghost">Cancel</Button>
+                <Button onClick={saveVibes} loading={savingVibes} variant="primary" style={{ minWidth: 120 }}>
                   {savingVibes ? "Saving…" : "Save Vibes"}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
