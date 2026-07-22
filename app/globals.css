@@ -370,14 +370,12 @@ html, body {
   background-attachment: fixed;
 }
 
-/* Tangerine Pop: comic-halftone paper — scattered funky doodles + faint ink
-   dot grid + bubblegum bloom. Doodles are a tiled SVG at low opacity so the
-   paper feels playful without competing with the white cards on top. */
+/* Tangerine Pop: WhatsApp-style doodle paper — Giggle-relevant line icons
+   (video camera, chat bubble, mic, smiley, heart, play, squad, lightning,
+   sparkles) tiled at low opacity. No dot grid; the doodles carry the texture. */
 [data-theme="tangerine"] body {
   background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360'%3E%3Cg fill='none' stroke='%231B1420' stroke-opacity='0.06' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M52 66 L58 82 75 83 62 94 66 111 52 101 38 111 42 94 29 83 46 82 Z'/%3E%3Cpath d='M250 54 q10 -16 20 0 t20 0 t20 0'/%3E%3Cpath d='M312 150 a5 5 0 1 1 -5 5 a10 10 0 1 1 10 -10 a15 15 0 1 1 -15 15'/%3E%3Cpath d='M170 158 v22 M159 169 h22'/%3E%3Cpath d='M92 246 c0 -9 14 -9 14 0 c0 8 -14 16 -14 16 c0 0 -14 -8 -14 -16 c0 -9 14 -9 14 0'/%3E%3Cpath d='M286 260 q4 -8 8 0 q8 4 0 8 q-4 8 -8 0 q-8 -4 0 -8 Z'/%3E%3Cpath d='M44 300 q10 -14 20 0 t20 0'/%3E%3Ccircle cx='214' cy='300' r='9'/%3E%3Cpath d='M140 60 q4 -8 8 0 q8 4 0 8 q-4 8 -8 0 q-8 -4 0 -8 Z'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 360px 360px,
-    radial-gradient(rgba(27,20,32,0.09) 1.2px, transparent 1.3px) 0 0 / 22px 22px,
-    radial-gradient(120% 60% at 50% -15%, rgba(255,122,178,0.14), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='440' height='440' viewBox='0 0 440 440'%3E%3Cg fill='none' stroke='%231B1420' stroke-opacity='0.05' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='translate(60 70) rotate(-8)'%3E%3Crect x='-14' y='-9' width='22' height='18' rx='4'/%3E%3Cpath d='M8 -4 L16 -8 L16 8 L8 4 Z'/%3E%3C/g%3E%3Cg transform='translate(210 52) rotate(6)'%3E%3Cpath d='M-15 -9 h28 v14 h-20 l-6 6 v-6 h-2 Z'/%3E%3C/g%3E%3Cg transform='translate(345 84) rotate(-5)'%3E%3Crect x='-4' y='-15' width='8' height='19' rx='4'/%3E%3Cpath d='M-9 0 a9 9 0 0 0 18 0 M0 13 v5 M-6 18 h12'/%3E%3C/g%3E%3Cg transform='translate(112 186) rotate(4)'%3E%3Ccircle r='12'/%3E%3Cpath d='M-5 -3 v3 M5 -3 v3'/%3E%3Cpath d='M-6 4 q6 6 12 0'/%3E%3C/g%3E%3Cg transform='translate(285 172) rotate(-10)'%3E%3Cpath d='M0 9 c-9 -6 -13 -13 -6 -17 c4 -2 6 1 6 4 c0 -3 2 -6 6 -4 c7 4 3 11 -6 17 Z'/%3E%3C/g%3E%3Cg transform='translate(392 214) rotate(8)'%3E%3Cpath d='M0 -14 L4 -4 15 -4 6 3 9 14 0 7 -9 14 -6 3 -15 -4 -4 -4 Z'/%3E%3C/g%3E%3Cg transform='translate(64 306) rotate(-6)'%3E%3Ccircle r='12'/%3E%3Cpath d='M-4 -6 L7 0 L-4 6 Z'/%3E%3C/g%3E%3Cg transform='translate(206 300) rotate(5)'%3E%3Ccircle cx='-6' cy='-6' r='4'/%3E%3Cpath d='M-13 8 a7 7 0 0 1 13 -1'/%3E%3Ccircle cx='7' cy='-6' r='4'/%3E%3Cpath d='M1 7 a7 7 0 0 1 13 1'/%3E%3C/g%3E%3Cg transform='translate(352 322) rotate(-8)'%3E%3Cpath d='M2 -14 L-6 2 H1 L-2 14 L9 -2 H2 Z'/%3E%3C/g%3E%3Cg transform='translate(150 392)'%3E%3Cpath d='M0 -9 Q1 -1 9 0 Q1 1 0 9 Q-1 1 -9 0 Q-1 -1 0 -9 Z'/%3E%3C/g%3E%3Cg transform='translate(320 404)'%3E%3Cpath d='M0 -7 Q1 -1 7 0 Q1 1 0 7 Q-1 1 -7 0 Q-1 -1 0 -7 Z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") 0 0 / 440px 440px,
     var(--bg);
   background-attachment: fixed;
 }
