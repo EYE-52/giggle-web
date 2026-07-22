@@ -370,10 +370,13 @@ html, body {
   background-attachment: fixed;
 }
 
-/* Tangerine Pop: comic-halftone paper — faint ink dot grid + bubblegum bloom. */
+/* Tangerine Pop: comic-halftone paper — scattered funky doodles + faint ink
+   dot grid + bubblegum bloom. Doodles are a tiled SVG at low opacity so the
+   paper feels playful without competing with the white cards on top. */
 [data-theme="tangerine"] body {
   background:
-    radial-gradient(rgba(27,20,32,0.10) 1.2px, transparent 1.3px) 0 0 / 22px 22px,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360'%3E%3Cg fill='none' stroke='%231B1420' stroke-opacity='0.06' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M52 66 L58 82 75 83 62 94 66 111 52 101 38 111 42 94 29 83 46 82 Z'/%3E%3Cpath d='M250 54 q10 -16 20 0 t20 0 t20 0'/%3E%3Cpath d='M312 150 a5 5 0 1 1 -5 5 a10 10 0 1 1 10 -10 a15 15 0 1 1 -15 15'/%3E%3Cpath d='M170 158 v22 M159 169 h22'/%3E%3Cpath d='M92 246 c0 -9 14 -9 14 0 c0 8 -14 16 -14 16 c0 0 -14 -8 -14 -16 c0 -9 14 -9 14 0'/%3E%3Cpath d='M286 260 q4 -8 8 0 q8 4 0 8 q-4 8 -8 0 q-8 -4 0 -8 Z'/%3E%3Cpath d='M44 300 q10 -14 20 0 t20 0'/%3E%3Ccircle cx='214' cy='300' r='9'/%3E%3Cpath d='M140 60 q4 -8 8 0 q8 4 0 8 q-4 8 -8 0 q-8 -4 0 -8 Z'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 360px 360px,
+    radial-gradient(rgba(27,20,32,0.09) 1.2px, transparent 1.3px) 0 0 / 22px 22px,
     radial-gradient(120% 60% at 50% -15%, rgba(255,122,178,0.14), transparent 55%),
     var(--bg);
   background-attachment: fixed;

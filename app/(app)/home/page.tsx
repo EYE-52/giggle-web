@@ -219,7 +219,7 @@ export default function HomePage() {
           {creating ? "Creating…" : "Create squad"}
         </Button>
         <div style={{ display: "flex", flexDirection: "column", gap: 5, flex: isPhone ? "1 1 100%" : "0 1 310px", minWidth: isPhone ? 0 : 260 }}>
-          <div style={{ display: "flex" }}>
+          <div style={{ display: "flex", alignItems: "stretch", height: 46, borderRadius: "var(--radius-control, 14px)", border: squadCodeFocused ? `1px solid ${ACCENT}` : "var(--control-border, 1px solid var(--border-strong))", boxShadow: squadCodeFocused ? `0 0 0 3px color-mix(in srgb, ${ACCENT} 14%, transparent)` : "none", background: "var(--surface)", overflow: "hidden", transition: "border-color .2s var(--ease-ui), box-shadow .2s var(--ease-ui)" }}>
             <input
               aria-label="Squad invite code"
               aria-describedby="squad-code-hint"
@@ -229,9 +229,9 @@ export default function HomePage() {
               placeholder="Join with code"
               autoCapitalize="characters" autoComplete="off" spellCheck={false} inputMode="text"
               onFocus={() => setSquadCodeFocused(true)} onBlur={() => setSquadCodeFocused(false)}
-              style={{ minWidth: 0, flex: 1, height: 46, borderRadius: "var(--radius-control, 14px) 0 0 var(--radius-control, 14px)", background: "transparent", border: squadCodeFocused ? `1px solid ${ACCENT}` : "1px solid var(--border-strong)", boxShadow: squadCodeFocused ? `0 0 0 3px color-mix(in srgb, ${ACCENT} 14%, transparent)` : "none", outline: "none", color: "var(--text)", padding: "0 14px", fontSize: 14, fontFamily: "var(--font-inter)", transition: "border-color .2s var(--ease-ui), box-shadow .2s var(--ease-ui)" }}
+              style={{ minWidth: 0, flex: 1, height: "100%", background: "transparent", border: "none", outline: "none", color: "var(--text)", padding: "0 14px", fontSize: 14, fontFamily: "var(--font-inter)" }}
             />
-            <button aria-label="Join squad" onClick={handleJoin} disabled={joining || !isValidSquadCode(squadCode)} className="gg-press" style={{ width: 48, height: 46, borderRadius: "0 var(--radius-control, 14px) var(--radius-control, 14px) 0", border: "1px solid var(--border-strong)", borderLeft: 0, background: "var(--overlay)", cursor: "pointer", opacity: joining || !isValidSquadCode(squadCode) ? 0.45 : 1, transition: "opacity .2s var(--ease-ui)" }}>
+            <button aria-label="Join squad" onClick={handleJoin} disabled={joining || !isValidSquadCode(squadCode)} className="gg-press" style={{ flexShrink: 0, width: 48, height: "100%", display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderLeft: "1px solid var(--border-strong)", background: "var(--overlay)", cursor: joining || !isValidSquadCode(squadCode) ? "not-allowed" : "pointer", opacity: joining || !isValidSquadCode(squadCode) ? 0.45 : 1, transition: "opacity .2s var(--ease-ui)" }}>
               {joining ? <span className="gg-spinner" /> : <Icon.enter size={18} color="var(--text)" />}
             </button>
           </div>
