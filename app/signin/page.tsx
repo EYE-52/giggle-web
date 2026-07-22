@@ -137,24 +137,9 @@ export default function AuthPage() {
               : (<><Icon.google size={20} /> Continue with Google</>)}
           </button>
 
-          <button
-            className="gg-press"
-            onClick={() => oauthRedirect("apple")}
-            disabled={busy}
-            style={{
-              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 11,
-              width: "100%", height: 50, borderRadius: "var(--radius-control, 14px)",
-              fontFamily: "inherit", fontWeight: 600, fontSize: 14,
-              background: "rgba(255,255,255,.06)", color: "#f4f4f7", border: "1px solid rgba(255,255,255,.14)",
-              boxShadow: "var(--shadow-sm)",
-              cursor: busy ? "wait" : "pointer", whiteSpace: "nowrap",
-              opacity: busy ? 0.7 : 1,
-            }}
-          >
-            {status === "redirecting" && activeProvider === "apple"
-              ? (<><span className="gg-spinner" aria-hidden /> Opening Apple...</>)
-              : (<><Icon.apple size={19} /> Continue with Apple</>)}
-          </button>
+          {/* Apple Sign-In is not configured yet (needs an Apple Developer
+              service ID + key on the backend). Re-add the button once
+              APPLE_* env vars are set, so we never ship a dead provider. */}
         </div>
 
         <p style={{ margin: "12px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.45 }}>We use your name and email to create your profile. We never post on your behalf.</p>
