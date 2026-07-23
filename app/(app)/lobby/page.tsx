@@ -137,6 +137,7 @@ function LobbyInner() {
   const [connTrouble, setConnTrouble] = useState(false);
   const [connTroubleDismissed, setConnTroubleDismissed] = useState(false);
   const [leavingSquad, setLeavingSquad] = useState(false);
+  const [leaveMenuOpen, setLeaveMenuOpen] = useState(false);
 
   // Cover picker
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
@@ -296,6 +297,14 @@ function LobbyInner() {
       }
       pollSucceeded();
     } catch (e) {
+      // Squad is gone (disbanded by the leader, or we were removed) → don't
+      // trap the user in a dead lobby; send them home with a note.
+      const status = (e as { status?: number })?.status;
+      const code = (e as { code?: string })?.code;
+      if (status === 404 || status === 403 || code === "SQUAD_NOT_FOUND" || code === "NOT_A_MEMBER") {
+        router.replace("/home");
+        return;
+      }
       console.error("getSquad failed:", e);
       pollFailed();
     } finally {
@@ -654,6 +663,21 @@ function LobbyInner() {
       console.error("leaveSquad failed:", e);
       setMatchError((e as { message?: string })?.message || "Couldn't leave squad.");
       setLeavingSquad(false);
+    }
+  }
+
+  async function handleDisbandSquad() {
+    if (!squadId || leavingSquad) return;
+    setLeavingSquad(true);
+    setMatchError(null);
+    try {
+      await api.disbandSquad(squadId);
+      router.push("/home");
+    } catch (e) {
+      console.error("disbandSquad failed:", e);
+      setMatchError((e as { message?: string })?.message || "Couldn't delete squad.");
+      setLeavingSquad(false);
+      setLeaveMenuOpen(false);
     }
   }
 
@@ -1379,7 +1403,7 @@ function LobbyInner() {
               {inviteCopied ? "Copied!" : "Invite"}
             </button>}
             <button
-              onClick={handleLeaveSquad}
+              onClick={() => { if (isLeader) setLeaveMenuOpen(true); else handleLeaveSquad(); }}
               disabled={leavingSquad}
               onMouseEnter={() => setLeaveHovered(true)}
               onMouseLeave={() => setLeaveHovered(false)}
@@ -2168,6 +2192,29 @@ function LobbyInner() {
       </div>
 
       {/* ── MODALS ── */}
+      {leaveMenuOpen && (
+        <Modal
+          onClose={() => { if (!leavingSquad) setLeaveMenuOpen(false); }}
+          title="Leave this squad?"
+          ariaLabel="Leave or delete squad"
+          width={400}
+        >
+          <p style={{ margin: "0 0 16px", fontSize: 14, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            You lead this squad. You can hand it off and leave, or delete it entirely.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Button variant="secondary" fullWidth disabled={leavingSquad} onClick={handleLeaveSquad}>
+              Leave &amp; hand off to another member
+            </Button>
+            <Button variant="danger" fullWidth loading={leavingSquad} onClick={handleDisbandSquad}>
+              Delete squad for everyone
+            </Button>
+            <Button variant="ghost" fullWidth disabled={leavingSquad} onClick={() => setLeaveMenuOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </Modal>
+      )}
       {noCamConfirmOpen && (
         <Modal
           onClose={() => { if (!noCamEnabling) setNoCamConfirmOpen(false); }}

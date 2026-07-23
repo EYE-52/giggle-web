@@ -72,6 +72,8 @@ export const api = {
     backendRequest<{ squadId: string; status: string }>(`/api/squads/${squadId}/search/cancel`, { method: "POST" }),
   leaveSquad: (squadId: string) =>
     backendRequest<{ squadId: string; squadDeleted: boolean }>(`/api/squads/${squadId}/leave`, { method: "POST" }),
+  disbandSquad: (squadId: string) =>
+    backendRequest<{ squadId: string; disbanded: boolean }>(`/api/squads/${squadId}/disband`, { method: "POST" }),
   setLobbyVideo: (squadId: string, inLobbyVideo: boolean) =>
     backendRequest<{ memberId: string; inLobbyVideo: boolean }>(`/api/squads/${squadId}/lobby-video`, { method: "POST", body: { inLobbyVideo } }),
   setEncounterVideo: (squadId: string, inEncounterVideo: boolean) =>

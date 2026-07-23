@@ -113,15 +113,18 @@ export default function HomePage() {
     return () => { alive = false; };
   }, []);
 
-  async function handleLeaveSquad(squadId: string) {
+  async function handleLeaveSquad(squadId: string, asLeader: boolean) {
     const previousSquads = mySquads;
     setMySquads(prev => prev.filter(s => s.squadId !== squadId));
     setRemoveConfirmId(null);
     try {
-      await api.leaveSquad(squadId);
+      // Leaders "delete" (disband the whole squad); members just leave.
+      if (asLeader) await api.disbandSquad(squadId);
+      else await api.leaveSquad(squadId);
+      toast(asLeader ? "Squad deleted." : "You left the squad.", "success");
     } catch (e) {
       setMySquads(previousSquads);
-      toast((e as { message?: string })?.message || "Couldn't leave that squad.", "error");
+      toast((e as { message?: string })?.message || (asLeader ? "Couldn't delete that squad." : "Couldn't leave that squad."), "error");
     }
   }
 
@@ -393,26 +396,30 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Leave-squad confirmation dialog */}
-      {leavingSquad && (
+      {/* Leave / delete-squad confirmation dialog (leaders delete, members leave) */}
+      {leavingSquad && (() => {
+        const isLeader = leavingSquad.myRole === "leader";
+        return (
         <Modal
           onClose={() => setRemoveConfirmId(null)}
-          ariaLabel="Leave squad"
+          ariaLabel={isLeader ? "Delete squad" : "Leave squad"}
           showClose={false}
           width={360}
         >
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            Leave “{leavingSquad.squadName}”?
+            {isLeader ? "Delete" : "Leave"} “{leavingSquad.squadName}”?
           </div>
           <p style={{ margin: "8px 0 18px", fontSize: 14, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            You&apos;ll drop out of this squad. You can rejoin later with an invite.
+            {isLeader
+              ? "This permanently deletes the squad for everyone in it. This can't be undone."
+              : "You'll drop out of this squad. You can rejoin later with an invite."}
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <Button variant="ghost" onClick={() => setRemoveConfirmId(null)}>Cancel</Button>
-            <Button variant="danger" onClick={() => handleLeaveSquad(leavingSquad.squadId)}>Leave</Button>
+            <Button variant="danger" onClick={() => handleLeaveSquad(leavingSquad.squadId, isLeader)}>{isLeader ? "Delete squad" : "Leave"}</Button>
           </div>
         </Modal>
-      )}
+      ); })()}
     </div>
   );
 }
