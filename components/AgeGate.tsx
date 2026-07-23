@@ -30,18 +30,59 @@ function ageFromDate(birth: Date, now: Date): number {
   return age;
 }
 
-const selectStyle: React.CSSProperties = {
-  minHeight: 48,
-  padding: "0 12px",
-  borderRadius: 12,
-  border: "1px solid var(--border-strong)",
-  background: "var(--surface-2)",
-  color: "var(--text)",
-  fontSize: 15,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  appearance: "auto",
-};
+/** A custom-styled dropdown — native chrome removed, own chevron + focus ring. */
+function DobSelect({
+  label, value, placeholder, onChange, children,
+}: {
+  label: string; value: string; placeholder: string;
+  onChange: (v: string) => void; children: React.ReactNode;
+}) {
+  const [focused, setFocused] = useState(false);
+  const placeholderShown = value === "";
+  return (
+    <div style={{ position: "relative", display: "flex" }}>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={{
+          width: "100%",
+          height: 48,
+          padding: "0 34px 0 14px",
+          borderRadius: "var(--radius-control, 12px)",
+          border: focused
+            ? "1px solid var(--accent, var(--violet))"
+            : "1px solid var(--border-strong)",
+          boxShadow: focused
+            ? "0 0 0 3px color-mix(in srgb, var(--accent, var(--violet)) 16%, transparent)"
+            : "none",
+          background: "var(--surface-2)",
+          color: placeholderShown ? "var(--text-muted)" : "var(--text)",
+          fontSize: 15,
+          fontFamily: "inherit",
+          fontWeight: placeholderShown ? 400 : 600,
+          cursor: "pointer",
+          appearance: "none",
+          WebkitAppearance: "none",
+          MozAppearance: "none",
+          outline: "none",
+          transition: "border-color .15s ease, box-shadow .15s ease",
+        }}
+      >
+        <option value="" disabled>{placeholder}</option>
+        {children}
+      </select>
+      {/* custom chevron */}
+      <span aria-hidden style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex" }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path d="m6 9 6 6 6-6" stroke="var(--text-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    </div>
+  );
+}
 
 /**
  * Blocking, full-screen onboarding step that collects a self-attested date of
@@ -158,39 +199,21 @@ export function AgeGate({ onDone }: { onDone: () => void }) {
             Date of birth
           </legend>
           <div style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 1.1fr", gap: 10 }}>
-            <select
-              aria-label="Birth month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="" disabled>Month</option>
+            <DobSelect label="Birth month" value={month} placeholder="Month" onChange={setMonth}>
               {MONTHS.map((label, i) => (
                 <option key={label} value={i}>{label}</option>
               ))}
-            </select>
-            <select
-              aria-label="Birth day"
-              value={day}
-              onChange={(e) => setDay(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="" disabled>Day</option>
+            </DobSelect>
+            <DobSelect label="Birth day" value={day} placeholder="Day" onChange={setDay}>
               {days.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
-            </select>
-            <select
-              aria-label="Birth year"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="" disabled>Year</option>
+            </DobSelect>
+            <DobSelect label="Birth year" value={year} placeholder="Year" onChange={setYear}>
               {years.map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
-            </select>
+            </DobSelect>
           </div>
         </fieldset>
 
