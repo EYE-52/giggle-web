@@ -196,6 +196,9 @@ export default function HomePage() {
       a.squadName.localeCompare(b.squadName));
   const openSignals = trending?.length ?? 0;
   const leavingSquad = removeConfirmId ? mySquads.find(s => s.squadId === removeConfirmId) ?? null : null;
+  // Squads you already belong to must never offer "Join" in the live rail —
+  // they open the lobby instead (mirrors the squad-preview membership fix).
+  const mySquadIdSet = new Set(mySquads.map(s => s.squadId));
 
   return (
     <div className="gg-reveal" style={{ display: "flex", flexDirection: "column", paddingBottom: 48, maxWidth: 1120, width: "100%", margin: "0 auto" }}>
@@ -356,10 +359,12 @@ export default function HomePage() {
               trending.slice(0, 5).map(sq => {
                 const spots = Math.max(0, sq.maxSlots - sq.memberCount);
                 const rowJoining = joiningId === sq.squadId;
+                const isMember = mySquadIdSet.has(sq.squadId);
+                const activateRow = () => isMember ? router.push(`/lobby?squad=${sq.squadId}`) : handleJoinTrending(sq);
                 return (
-                  <div key={sq.squadId} onClick={() => handleJoinTrending(sq)} role="button" tabIndex={rowJoining ? -1 : 0}
+                  <div key={sq.squadId} onClick={activateRow} role="button" tabIndex={rowJoining ? -1 : 0}
                     aria-disabled={rowJoining || undefined}
-                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleJoinTrending(sq); } }}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activateRow(); } }}
                     className="gg-focusable"
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderTop: "1px solid var(--border)", cursor: rowJoining ? "default" : "pointer", pointerEvents: rowJoining ? "none" : undefined, opacity: rowJoining ? 0.6 : 1, background: openHoveredId === `signal-${sq.squadId}` ? "var(--surface-2)" : "transparent", transition: "background .18s var(--ease-ui), opacity .2s var(--ease-ui)" }}
                     onMouseEnter={() => setOpenHoveredId(`signal-${sq.squadId}`)}
@@ -375,9 +380,9 @@ export default function HomePage() {
                       </div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>{spots} spot{spots !== 1 ? "s" : ""}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>{isMember ? "Joined" : `${spots} spot${spots !== 1 ? "s" : ""}`}</div>
                       <span className="gg-press" style={{ display: "inline-block", marginTop: 5, height: 28, lineHeight: "28px", padding: "0 12px", borderRadius: "var(--radius-pill, 999px)", background: "var(--accent-soft)", color: "var(--accent)", fontWeight: 700, fontSize: 12 }}>
-                        {joiningId === sq.squadId ? "…" : "Join"}
+                        {isMember ? "Open" : (joiningId === sq.squadId ? "…" : "Join")}
                       </span>
                     </div>
                   </div>

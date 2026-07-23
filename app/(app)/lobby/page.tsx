@@ -1656,7 +1656,11 @@ function LobbyInner() {
                       </div>
                       <div style={{ display: isNarrow ? "none" : "flex", gap: 4 }}>
                         {isMe ? (
-                          /* Local user — real interactive mic/cam toggles. */
+                          /* Local user — real interactive mic/cam toggles, but
+                             only once lobby media is actually connected. Before
+                             that they'd show a fake "on" state and error on tap;
+                             the control bar's "Enable camera & mic" is the path. */
+                          !videoJoined ? null :
                           <>
                             {(() => {
                               const common: React.CSSProperties = {

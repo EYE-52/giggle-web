@@ -509,7 +509,7 @@ function MatchmakingInner() {
             label="Squad size"
             value={
               <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}>
-                {`${squad?.members.length ?? "?"} / 4`}
+                {`${squad?.members.length ?? "?"} / ${squad?.maxSlots ?? 4}`}
                 {squadError && !squad && (
                   <button
                     onClick={() => fetchSquad(false)}

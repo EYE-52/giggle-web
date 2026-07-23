@@ -85,6 +85,20 @@ function normalizeProfileSettings(value: unknown): ProfileSettings {
   };
 }
 
+/** Stable module-scoped row so toggling a Switch doesn't remount it (an inline
+ *  component would be a new type each render, killing the thumb animation). */
+function SwitchRow({ label, desc, value, onChange }: { label: string; desc: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--border)", gap: 12 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 600 }}>{label}</div>
+        <div style={{ color: "var(--text-dim)", fontSize: 12, marginTop: 2 }}>{desc}</div>
+      </div>
+      <Switch checked={value} onChange={onChange} ariaLabel={label} />
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { isPhone, isTablet } = useViewport();
@@ -312,16 +326,6 @@ export default function ProfilePage() {
   const [vibeChipHover, setVibeChipHover] = useState<string | null>(null);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
 
-  const SwitchRow = ({ label, desc, value, onChange }: { label: string; desc: string; value: boolean; onChange: (v: boolean) => void }) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--border)", gap: 12 }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: textPrimary, fontSize: 14, fontWeight: 600 }}>{label}</div>
-        <div style={{ color: textTertiary, fontSize: 12, marginTop: 2 }}>{desc}</div>
-      </div>
-      <Switch checked={value} onChange={onChange} ariaLabel={label} />
-    </div>
-  );
-
   // Responsive layout: single column on tablet/phone, 2-col on desktop
   const outerGrid: React.CSSProperties = isTablet
     ? { display: "flex", flexDirection: "column", gap: isPhone ? 16 : 20 }
@@ -409,10 +413,16 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Upgrade to Giggle+"
             onClick={() => router.push("/premium")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push("/premium"); }
+            }}
             onMouseEnter={() => setUpgradeCardHover(true)}
             onMouseLeave={() => setUpgradeCardHover(false)}
-            className="gg-press-card"
+            className="gg-press-card gg-focusable"
             style={{
               ...surface, cursor: "pointer",
               background: upgradeCardHover
@@ -573,30 +583,39 @@ export default function ProfilePage() {
             </div>
             <div>
               <div style={{ color: textPrimary, fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Country</div>
-              <select
-                value={country}
-                onChange={(e) => { demoTouchedRef.current = true; setCountry(e.target.value); }}
-                onFocus={() => setCountryFocus(true)}
-                onBlur={() => setCountryFocus(false)}
-                style={{
-                  width: "100%", boxSizing: "border-box", minHeight: 44, padding: "10px 14px", fontSize: 14,
-                  borderRadius: "var(--radius-control, 14px)", border: countryFocus ? "1px solid var(--accent, var(--violet))" : "1px solid var(--border-strong)",
-                  boxShadow: countryFocus ? "0 0 0 3px color-mix(in srgb, var(--accent, var(--violet)) 30%, transparent)" : "none",
-                  background: "var(--overlay)", color: country ? textPrimary : textTertiary, outline: "none",
-                  appearance: "none", cursor: "pointer",
-                  transition: "box-shadow .2s var(--ease-ui), border-color .2s var(--ease-ui)",
-                }}
-              >
-                <option value="">Select a country…</option>
-                {COMMON_COUNTRIES.map((c) => (
-                  <option key={c.code} value={c.code}>{c.flag} {c.label}</option>
-                ))}
-                {/* Loaded country outside the common list — keep it selectable so it
-                    displays and can't be silently wiped by the controlled select. */}
-                {country && !COMMON_COUNTRIES.some((c) => c.code === country) && (
-                  <option value={country}>{country}</option>
-                )}
-              </select>
+              <div style={{ position: "relative", display: "flex" }}>
+                <select
+                  value={country}
+                  onChange={(e) => { demoTouchedRef.current = true; setCountry(e.target.value); }}
+                  onFocus={() => setCountryFocus(true)}
+                  onBlur={() => setCountryFocus(false)}
+                  style={{
+                    width: "100%", boxSizing: "border-box", minHeight: 44, padding: "10px 34px 10px 14px", fontSize: 14,
+                    borderRadius: "var(--radius-control, 14px)", border: countryFocus ? "1px solid var(--accent, var(--violet))" : "1px solid var(--border-strong)",
+                    boxShadow: countryFocus ? "0 0 0 3px color-mix(in srgb, var(--accent, var(--violet)) 30%, transparent)" : "none",
+                    background: "var(--overlay)", color: country ? textPrimary : textTertiary, outline: "none",
+                    appearance: "none", WebkitAppearance: "none", MozAppearance: "none", cursor: "pointer",
+                    transition: "box-shadow .2s var(--ease-ui), border-color .2s var(--ease-ui)",
+                  }}
+                >
+                  <option value="">Select a country…</option>
+                  {COMMON_COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.flag} {c.label}</option>
+                  ))}
+                  {/* Loaded country outside the common list — keep it selectable so it
+                      displays and can't be silently wiped by the controlled select. */}
+                  {country && !COMMON_COUNTRIES.some((c) => c.code === country) && (
+                    <option value={country}>{country}</option>
+                  )}
+                </select>
+                {/* Custom chevron — appearance:none strips the native arrow, so
+                    supply our own affordance (matches the AgeGate DOB dropdowns). */}
+                <span aria-hidden style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="m6 9 6 6 6-6" stroke={textMuted} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+              </div>
             </div>
           </div>
 
