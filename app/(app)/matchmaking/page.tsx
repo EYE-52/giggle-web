@@ -2,9 +2,8 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Logomark } from "@/components/Brand";
-import { AvatarArt } from "@/components/AvatarArt";
 import { Icon } from "@/components/Icons";
-import { api, connectSocket, SOCKET_EVENTS, session, getMyAvatar, subscribeAvatar, DEFAULT_AVATAR_ID } from "@giggle/core";
+import { api, connectSocket, SOCKET_EVENTS } from "@giggle/core";
 import type { SquadState } from "@giggle/core";
 import { useViewport } from "@/components/useViewport";
 import { Button } from "@/components/Button";
@@ -34,6 +33,9 @@ function MatchmakingInner() {
   const showLongSearch = !matchFound && elapsed - longSearchBaseline >= 75;
   // Both the socket event and the 2s poll can fire — ensure we reveal/navigate once.
   const revealedRef = useRef(false);
+  // Set the instant the user cancels — makes the poll/socket stop triggering a
+  // match reveal so a late in-flight response can't re-add or resurrect the search.
+  const cancelledRef = useRef(false);
   const revealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // getSquad silent auto-retry timer — cleared on unmount so the retry can't
@@ -51,16 +53,7 @@ function MatchmakingInner() {
     }
   }
 
-  // Local user's chosen avatar (SSR-safe: read after mount)
-  const [myAvatar, setMyAvatar] = useState<string>(DEFAULT_AVATAR_ID);
-  useEffect(() => {
-    setMyAvatar(getMyAvatar());
-    return subscribeAvatar((v) => setMyAvatar(v));
-  }, []);
-
   const violet = "var(--accent, var(--violet))";
-  const lime = "var(--lime)";
-  const limeText = "var(--lime-text)";
   const textPrimary = "var(--text)";
   const textMuted = "var(--text-muted)";
 
@@ -81,8 +74,15 @@ function MatchmakingInner() {
     const tick = setInterval(() => setElapsed(e => e + 1), 1000);
 
     const pollInterval = setInterval(async () => {
+      // Once the user has cancelled, stop polling entirely — a late "matched"
+      // response must not resurrect the search or trigger a reveal.
+      if (cancelledRef.current) {
+        clearInterval(pollInterval);
+        return;
+      }
       try {
         const status = await api.matchStatus(squadId);
+        if (cancelledRef.current) return;
         // Poll succeeded — recover silently from any reconnect state.
         if (pollFailuresRef.current > 0) {
           pollFailuresRef.current = 0;
@@ -100,6 +100,7 @@ function MatchmakingInner() {
 
     const socket = connectSocket(squadId);
     const onMatchFound = ({ encounterId, opponentSquadName }: { encounterId: string; opponentSquadName?: string }) => {
+      if (cancelledRef.current) return;
       clearInterval(pollInterval);
       triggerMatchReveal(encounterId, opponentSquadName);
     };
@@ -148,26 +149,27 @@ function MatchmakingInner() {
   async function handleCancel() {
     // No cancelling once the match reveal/navigation has started.
     if (!squadId || cancelling || revealedRef.current) return;
+    // Flip the cancelled flag FIRST so the poll/socket immediately stop and can't
+    // re-add the search while the backend call is in flight.
+    cancelledRef.current = true;
     setCancelling(true);
     setCancelError(null);
+    // Stop the local timers right away — don't wait for unmount cleanup.
+    clearRevealTimers();
+    if (squadRetryTimeoutRef.current) {
+      clearTimeout(squadRetryTimeoutRef.current);
+      squadRetryTimeoutRef.current = null;
+    }
+    // Best-effort: ask the backend to leave the queue, but ALWAYS return to the
+    // lobby afterwards — a failed/slow dequeue call must never trap the user on
+    // this screen. (The lobby re-syncs queue state, so a stale entry self-heals.)
     try {
       await api.cancelSearch(squadId);
     } catch {
-      setCancelError("Couldn't cancel search. Your squad is still in the queue.");
-      setCancelling(false);
-      return;
+      // swallow — we navigate regardless
     }
     router.push(`/lobby?squad=${squadId}`);
   }
-
-  const members = squad?.members ?? [];
-  // Orbit tokens for the radar — cap at 4 so they stay evenly spaced and uncrowded.
-  const orbitTokens = members.slice(0, 4).map((m, i) => ({
-    key: m.memberId ?? `${m.displayName}-${i}`,
-    name: m.displayName,
-    isMe: session.user?.id ? m.userId === session.user.id : i === 0,
-    colorIndex: i,
-  }));
 
   if (!squadId) {
     return (
@@ -191,43 +193,26 @@ function MatchmakingInner() {
           0% { transform: scale(1); opacity: 0.55; }
           100% { transform: scale(1.6); opacity: 0; }
         }
-        @keyframes rotateSlow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
         @keyframes breatheGlow {
           0%, 100% { box-shadow: 0 0 32px -4px #7C5CFF, 0 0 0px #7C5CFF; }
           50% { box-shadow: 0 0 52px 2px #7C5CFF, 0 0 80px -10px #7C5CFF55; }
         }
-        @keyframes centerFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
+        /* The radar sweep + its glowing leading edge share ONE clock so they
+           stay perfectly locked together as they rotate. */
         @keyframes sweepSpin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-        @keyframes ripple {
-          0% { transform: scale(0.35); opacity: 0; }
-          12% { opacity: 0.7; }
-          100% { transform: scale(1); opacity: 0; }
+        /* Blips: a faint contact that fades up then out, on a stagger. */
+        @keyframes blipPulse {
+          0%, 100% { transform: scale(0.6); opacity: 0; }
+          8% { opacity: 0.9; }
+          45% { transform: scale(1); opacity: 0.55; }
+          70% { opacity: 0; }
         }
-        /* Orbits: wrapper spins, avatar counter-spins to stay upright */
-        @keyframes orbitSpin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes orbitSpinR {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(-360deg); }
-        }
-        @keyframes orbResolve {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(-360deg); }
-        }
-        @keyframes pulseDot {
-          0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(194,255,61,0.55); }
-          50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(194,255,61,0); }
+        @keyframes statusDot {
+          0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(163,230,53,0.5); }
+          50% { opacity: 0.4; box-shadow: 0 0 0 5px rgba(163,230,53,0); }
         }
         @keyframes matchRevealBg {
           from { opacity: 0; }
@@ -364,98 +349,99 @@ function MatchmakingInner() {
         overflow: "hidden",
         position: "relative",
       }}>
-        {/* ── RADAR HERO — the centerpiece. A fixed, self-contained square so the
-            orbiting avatars stay strictly INSIDE it and never collide with the
-            title below. Everything else is arranged around this. ── */}
+        {/* ── RADAR HERO — a clean, perfectly-centered scanning radar. Concentric
+            rings + spoke grid + dot-grid for depth, a smooth conic-gradient sweep
+            with a soft fading trail and a glowing leading edge, and the Giggle
+            logomark centered as the squad's identity. All layers are the SAME
+            centered square so nothing drifts or misaligns. ── */}
         {(() => {
-          const dim = isShortPhone ? 190 : isPhone ? 244 : 380;
-          const sweepSize = isShortPhone ? 132 : isPhone ? 168 : 264;     // conic beam disc
-          const tokenSize = isShortPhone ? 30 : isPhone ? 34 : 44;
-          // Orbit radius kept well inside the square: orbitR + token/2 < dim/2.
-          const orbitR = isShortPhone ? 70 : isPhone ? 92 : 148;
-          const tokens = orbitTokens.length ? orbitTokens : [{ key: "me", name: "You", isMe: true, colorIndex: 0 }];
-          const tokenGrads = [
-            "linear-gradient(145deg,#7C5CFF,#5B3FD4)",
-            "linear-gradient(145deg,#3DD6C0,#1FA89A)",
-            "linear-gradient(145deg,#C2FF3D,#7FA81E)",
-            "linear-gradient(145deg,#FF8A5C,#E0633A)",
+          const dim = isShortPhone ? 190 : isPhone ? 244 : 340;
+          // Concentric ring diameters as a fraction of the outer disc.
+          const rings = [1, 0.7, 0.4];
+          const centerSize = isShortPhone ? 58 : isPhone ? 66 : 96;
+          // Two deterministic "contacts" — fixed positions, staggered pulse.
+          const blips = [
+            { x: 0.70, y: 0.32, delay: "0.4s" },
+            { x: 0.30, y: 0.66, delay: "2.1s" },
           ];
+          // Every rotating layer shares this duration so they stay locked.
+          const sweep = "5.2s";
           return (
-        <div style={{ position: "relative", zIndex: 1, flexShrink: 0, width: dim, height: dim, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {/* Rippling concentric rings — expand + fade outward on a stagger */}
-          {[0, 1].map(i => (
-            <div key={`r${i}`} style={{
-              position: "absolute", width: dim, height: dim, borderRadius: "50%",
-              border: "1.5px solid rgba(124,92,255,0.45)",
-              animation: `ripple 3.6s ease-out ${i * 1.8}s infinite`,
+        <div aria-hidden style={{ position: "relative", zIndex: 1, flexShrink: 0, width: dim, height: dim, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {/* Soft violet glow behind the whole radar */}
+          <div style={{
+            position: "absolute", width: dim * 1.05, height: dim * 1.05, borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(124,92,255,0.20) 0%, rgba(124,92,255,0.06) 42%, transparent 68%)",
+            filter: "blur(2px)",
+          }} />
+
+          {/* Dot-grid + radial spoke lines, masked to a disc and faded at the rim */}
+          <div style={{
+            position: "absolute", width: dim, height: dim, borderRadius: "50%",
+            backgroundImage: [
+              "repeating-conic-gradient(from 0deg, rgba(124,92,255,0.10) 0deg 0.4deg, transparent 0.4deg 30deg)",
+              "radial-gradient(rgba(124,92,255,0.16) 1px, transparent 1.6px)",
+            ].join(","),
+            backgroundSize: `auto, ${isPhone ? 16 : 20}px ${isPhone ? 16 : 20}px`,
+            maskImage: "radial-gradient(circle, #000 58%, transparent 74%)",
+            WebkitMaskImage: "radial-gradient(circle, #000 58%, transparent 74%)",
+          }} />
+
+          {/* Concentric rings — statically centered, perfectly aligned */}
+          {rings.map((f, i) => (
+            <div key={`ring${i}`} style={{
+              position: "absolute", width: dim * f, height: dim * f, borderRadius: "50%",
+              border: `1px solid rgba(124,92,255,${0.34 - i * 0.06})`,
             }} />
           ))}
 
-          {/* Rotating conic-gradient SWEEP beam (the radar scan) */}
+          {/* The SWEEP — a conic gradient with a soft fading trail. Masked to a
+              disc so it reads as a beam fanning out from the centre. */}
           <div style={{
-            position: "absolute", width: sweepSize, height: sweepSize, borderRadius: "50%",
-            background: "conic-gradient(from 0deg, rgba(124,92,255,0) 0deg, rgba(124,92,255,0) 270deg, rgba(124,92,255,0.10) 320deg, rgba(124,92,255,0.45) 352deg, rgba(194,255,61,0.55) 360deg)",
-            animation: "sweepSpin 3.6s linear infinite",
-            maskImage: "radial-gradient(circle, #000 62%, transparent 63%)",
-            WebkitMaskImage: "radial-gradient(circle, #000 62%, transparent 63%)",
+            position: "absolute", width: dim, height: dim, borderRadius: "50%",
+            background: "conic-gradient(from 0deg, rgba(124,92,255,0) 0deg, rgba(124,92,255,0) 235deg, rgba(124,92,255,0.05) 285deg, rgba(124,92,255,0.22) 336deg, rgba(163,230,53,0.42) 357deg, rgba(163,230,53,0.55) 360deg)",
+            maskImage: "radial-gradient(circle, #000 0%, #000 57%, transparent 72%)",
+            WebkitMaskImage: "radial-gradient(circle, #000 0%, #000 57%, transparent 72%)",
+            animation: `sweepSpin ${sweep} linear infinite`,
           }} />
 
-          {/* Rotating dashed ring */}
+          {/* Glowing leading edge — a thin line pinned to the sweep's front, on
+              the SAME clock so it tracks the beam exactly */}
           <div style={{
-            position: "absolute", width: isShortPhone ? 120 : isPhone ? 156 : 248, height: isShortPhone ? 120 : isPhone ? 156 : 248, borderRadius: "50%",
-            border: "2px dashed rgba(124,92,255,0.33)",
-            animation: "rotateSlow 9s linear infinite",
-          }} />
-          {/* Center: Giggle logomark — breathing glow + gentle float */}
-          <div style={{ position: "relative", zIndex: 3, animation: "centerFloat 4.5s ease-in-out infinite" }}>
+            position: "absolute", width: dim, height: dim, animation: `sweepSpin ${sweep} linear infinite`,
+          }}>
             <div style={{
-              width: isShortPhone ? 54 : isPhone ? 64 : 100, height: isShortPhone ? 54 : isPhone ? 64 : 100, borderRadius: "50%",
-              background: "radial-gradient(circle at 50% 38%, #1a1330 0%, #0e0e18 100%)",
-              border: `2px solid ${violet}`,
-              animation: "breatheGlow 2.8s ease-in-out infinite",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Logomark size={isShortPhone ? 30 : isPhone ? 36 : 54} />
-            </div>
+              position: "absolute", left: "50%", top: 0, height: "50%", width: 2,
+              transformOrigin: "bottom center", transform: "translateX(-50%)",
+              background: "linear-gradient(to top, rgba(163,230,53,0) 0%, rgba(163,230,53,0.35) 60%, rgba(163,230,53,0.9) 100%)",
+              boxShadow: "0 0 10px 1px rgba(163,230,53,0.5)",
+              borderRadius: 2,
+            }} />
           </div>
 
-          {/* Orbiting squad avatars — real tokens (your AvatarArt; teammates get a
-              polished gradient token with a person glyph, never a bare initial).
-              The lane wrapper spins; the token counter-spins to stay upright. */}
-          {tokens.map((t, i) => {
-            const n = tokens.length;
-            const dur = 20 + i * 4;
-            return (
-              <div key={t.key} aria-hidden style={{
-                position: "absolute", width: orbitR * 2, height: orbitR * 2, borderRadius: "50%",
-                zIndex: 2, pointerEvents: "none",
-                transform: `rotate(${(360 / n) * i}deg)`,
-              }}>
-                <div style={{ position: "absolute", inset: 0, animation: `orbitSpin ${dur}s linear infinite` }}>
-                  <div style={{
-                    position: "absolute", top: -tokenSize / 2, left: "50%", marginLeft: -tokenSize / 2,
-                    animation: `orbResolve ${dur}s linear infinite`,
-                  }}>
-                    {t.isMe ? (
-                      <div style={{ borderRadius: "50%", boxShadow: "0 0 0 2px rgba(11,11,15,0.92), 0 0 20px -2px rgba(124,92,255,0.75)" }}>
-                        <AvatarArt value={myAvatar} size={tokenSize} />
-                      </div>
-                    ) : (
-                      <div title={t.name} style={{
-                        width: tokenSize, height: tokenSize, borderRadius: "50%",
-                        background: tokenGrads[t.colorIndex % tokenGrads.length],
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        border: "1.5px solid rgba(255,255,255,0.16)",
-                        boxShadow: "0 0 0 2px rgba(11,11,15,0.92), 0 0 18px -3px rgba(124,92,255,0.6)",
-                      }}>
-                        <Icon.account size={Math.round(tokenSize * 0.5)} color="#fff" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {/* Deterministic scan contacts (blips) */}
+          {blips.map((b, i) => (
+            <div key={`blip${i}`} style={{
+              position: "absolute", left: `${b.x * 100}%`, top: `${b.y * 100}%`,
+              width: 7, height: 7, marginLeft: -3.5, marginTop: -3.5, borderRadius: "50%",
+              background: "var(--lime, #A3E635)",
+              boxShadow: "0 0 8px 1px rgba(163,230,53,0.7)",
+              animation: `blipPulse 5.2s ${b.delay} ease-in-out infinite`,
+            }} />
+          ))}
+
+          {/* Center: Giggle logomark — the squad identity, with a breathing glow */}
+          <div style={{ position: "relative", zIndex: 3 }}>
+            <div style={{
+              width: centerSize, height: centerSize, borderRadius: "50%",
+              background: "radial-gradient(circle at 50% 38%, #16112a 0%, #0d0c14 100%)",
+              border: `1.5px solid ${violet}`,
+              animation: "breatheGlow 3.2s ease-in-out infinite",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Logomark size={isShortPhone ? 30 : isPhone ? 34 : 48} />
+            </div>
+          </div>
         </div>
           );
         })()}
@@ -560,25 +546,28 @@ function MatchmakingInner() {
           </div>
         )}
 
-        {/* Queue signal — informational only while the squad is already searching. */}
-        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+        {/* Queue signal — AMBIENT status, not an action. A small pulsing live dot
+            + muted rotating copy. Deliberately borderless / no button chrome so it
+            can never be mistaken for something tappable. */}
+        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
           <div
             role="status"
             aria-live="polite"
             style={{
-              padding: isShortPhone ? "10px 20px" : "14px 36px", borderRadius: 999,
-              background: "linear-gradient(135deg, rgba(194,255,61,0.15), rgba(124,92,255,0.25))",
-              color: limeText,
-              fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 14, fontWeight: 700,
-              display: "flex", alignItems: "center", gap: 8, justifyContent: "center" as const,
-              border: "1px solid var(--lime-border, rgba(194,255,61,0.35))",
-              width: isPhone ? "100%" : undefined,
+              display: "inline-flex", alignItems: "center", gap: 9, justifyContent: "center",
+              color: textMuted,
+              fontFamily: "var(--font-body)", fontSize: isShortPhone ? 13 : 14, fontWeight: 500,
+              letterSpacing: "0.01em",
             }}
           >
-            <Icon.lightning size={18} color="var(--lime-text, #C2FF3D)" />
-            {progressLabel}
+            <span aria-hidden style={{
+              width: 8, height: 8, borderRadius: 999, flexShrink: 0,
+              background: "var(--live, #A3E635)",
+              animation: "statusDot 1.6s ease-in-out infinite",
+            }} />
+            <span>{progressLabel}<span style={{ opacity: 0.7 }}>…</span></span>
           </div>
-          <div style={{ color: textMuted, fontSize: isShortPhone ? 12 : 13 }}>
+          <div style={{ color: "color-mix(in srgb, var(--text-muted) 78%, transparent)", fontSize: isShortPhone ? 12 : 13 }}>
             We&apos;ll bring you a compatible squad as soon as one is online.
           </div>
         </div>

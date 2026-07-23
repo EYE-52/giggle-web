@@ -11,7 +11,7 @@ import { InviteToSquad } from "@/components/InviteToSquad";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
-import { api, connectSocket, SOCKET_EVENTS, session, getMyAvatar, subscribeAvatar, subscribeChat, joinChat, DEFAULT_AVATAR_ID } from "@giggle/core";
+import { api, connectSocket, SOCKET_EVENTS, session, getMyAvatar, subscribeAvatar, subscribeChat, joinChat, DEFAULT_AVATAR_ID, classifyVibe } from "@giggle/core";
 import { coverKind, coverBackground, fallbackGradient } from "@/components/covers";
 import type { SquadState, JoinRequestUser } from "@giggle/core";
 import { createVideoClient } from "@giggle/agora";
@@ -168,11 +168,12 @@ function LobbyInner() {
     } catch {}
   }, []);
   const MAX_VIBES = 5;
-  function addCustomVibe(raw: string) {
-    const v = raw.trim().replace(/\s+/g, " ");
-    if (!v || v.length > 24) return;
+  // Moderation UX for user-created vibes: block disallowed terms, and require an
+  // 18+ confirmation for adult vibes (which turns the squad into an adult room).
+  const [vibeWarning, setVibeWarning] = useState<string | null>(null);
+  const [pendingMatureVibe, setPendingMatureVibe] = useState<string | null>(null);
+  function commitVibe(v: string) {
     const lower = v.toLowerCase();
-    // Already selected? no-op. Otherwise add (respecting the per-squad cap).
     if (selectedVibes.some(x => x.toLowerCase() === lower)) { setVibeSearch(""); return; }
     if (selectedVibes.length >= MAX_VIBES) return;
     setSelectedVibes(prev => [...prev, v]);
@@ -183,6 +184,22 @@ function LobbyInner() {
       return next;
     });
     setVibeSearch("");
+  }
+  function addCustomVibe(raw: string) {
+    const v = raw.trim().replace(/\s+/g, " ");
+    if (!v || v.length > 24) return;
+    setVibeWarning(null);
+    const verdict = classifyVibe(v);
+    if (verdict === "blocked") {
+      setVibeWarning("That vibe isn't allowed. Try something that keeps Giggle welcoming for everyone.");
+      return;
+    }
+    if (verdict === "mature") {
+      // Don't add silently — surface the 18+ gate first.
+      setPendingMatureVibe(v);
+      return;
+    }
+    commitVibe(v);
   }
 
   // Visibility toggle
@@ -227,6 +244,8 @@ function LobbyInner() {
   const [inviteHovered, setInviteHovered] = useState(false);
   const [inviteTileHovered, setInviteTileHovered] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [copyLinkHovered, setCopyLinkHovered] = useState(false);
   const [leaveHovered, setLeaveHovered] = useState(false);
   const [micHovered, setMicHovered] = useState(false);
   const [camHovered, setCamHovered] = useState(false);
@@ -494,16 +513,28 @@ function LobbyInner() {
     }
   }
 
+  // Shareable invite link: opening it joins the squad and drops the person
+  // straight into this lobby (signing them in first if needed).
+  const inviteUrl = squad && typeof window !== "undefined"
+    ? `${window.location.origin}/join/${squad.squadCode}`
+    : "";
+
   async function handleInvite() {
-    if (!squad) return;
-    const text = `Join my Giggle squad — enter code ${squad.squadCode} at ${typeof window !== "undefined" ? window.location.origin : "giggle"}`;
+    if (!squad || !inviteUrl) return;
+    // Prefer the native share sheet on phones; fall back to copying the link.
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function" && isPhone) {
+      try {
+        await navigator.share({ title: "Join my Giggle squad", text: `Join my squad "${squad.squadName}" on Giggle`, url: inviteUrl });
+        return;
+      } catch { /* user dismissed or unsupported — fall through to copy */ }
+    }
     await copyToClipboard(
-      text,
+      inviteUrl,
       () => {
         setInviteCopied(true);
         setTimeout(() => setInviteCopied(false), 1800);
       },
-      "Couldn't copy invite link. Select and copy the squad code instead.",
+      "Couldn't copy the invite link. Copy the squad code instead.",
     );
   }
 
@@ -990,7 +1021,7 @@ function LobbyInner() {
       padding: 16,
       display: "flex", flexDirection: "column", gap: 10,
     }}>
-      <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 13, fontWeight: 700, color: textPrimary, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>Invite Code</div>
+      <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 13, fontWeight: 700, color: textPrimary, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>Invite people</div>
       <div style={{
         background: "var(--surface-2)", border: "1px solid var(--border)",
         borderRadius: 10, padding: "10px 12px",
@@ -999,6 +1030,28 @@ function LobbyInner() {
       }}>
         {squad.squadCode}
       </div>
+      {/* Primary: share a link that joins + opens the lobby in one tap. */}
+      <button
+        onClick={() => void copyToClipboard(
+          inviteUrl,
+          () => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 1800); },
+          "Couldn't copy the invite link. Copy the code instead.",
+        )}
+        onMouseEnter={() => setCopyLinkHovered(true)}
+        onMouseLeave={() => setCopyLinkHovered(false)}
+        style={{
+          width: "100%", minHeight: 44, padding: "0 12px", borderRadius: 9,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+          background: linkCopied ? "var(--live)" : "var(--accent, var(--violet))",
+          border: "1px solid transparent",
+          color: linkCopied ? "#0B0B0F" : "var(--on-accent, #fff)", fontSize: 13, fontWeight: 700, cursor: "pointer",
+          opacity: copyLinkHovered && !linkCopied ? 0.92 : 1,
+          transition: "all .15s ease",
+        }}
+      >
+        <Icon.enter size={15} color={linkCopied ? "#0B0B0F" : "var(--on-accent, #fff)"} />
+        {linkCopied ? "Invite link copied!" : "Copy invite link"}
+      </button>
       <button
         onClick={() => void copyToClipboard(
           squad.squadCode,
@@ -1018,7 +1071,7 @@ function LobbyInner() {
           transition: "all .15s ease",
         }}
       >
-        {codeCopied ? "Copied!" : "Copy Code"}
+        {codeCopied ? "Copied!" : "Copy code instead"}
       </button>
     </div>
   );
@@ -1175,15 +1228,14 @@ function LobbyInner() {
                     title="Rename squad"
                     aria-label="Rename squad"
                     style={{
-                      width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                      width: 32, height: 32, flexShrink: 0, padding: 0,
                       cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      background: renameHovered ? "var(--overlay-hover)" : "var(--overlay)",
-                      border: "1px solid var(--border)",
+                      background: "transparent", border: "none",
                       transition: "all .15s ease",
                     }}
                   >
-                    <Icon.edit size={13} color={renameHovered ? violet : textMuted} />
+                    <Icon.edit size={16} color={renameHovered ? violet : textMuted} />
                   </button>
                 )}
               </>
@@ -2174,12 +2226,53 @@ function LobbyInner() {
               />
             </div>
 
+            {/* Moderation: blocked-vibe warning */}
+            {vibeWarning && (
+              <div role="alert" style={{
+                display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", borderRadius: 10,
+                background: "var(--coral-soft, rgba(229,72,77,0.12))", border: "1px solid color-mix(in srgb, var(--coral) 40%, transparent)",
+                color: "var(--coral)", fontSize: 13, lineHeight: 1.4,
+              }}>
+                {vibeWarning}
+              </div>
+            )}
+
+            {/* Moderation: 18+ age gate for adult vibes */}
+            {pendingMatureVibe && (
+              <div role="alertdialog" aria-label="Adult vibe confirmation" style={{
+                display: "flex", flexDirection: "column", gap: 10, padding: "14px 14px", borderRadius: 12,
+                background: "var(--amber-soft, rgba(245,158,11,0.12))", border: "1px solid color-mix(in srgb, var(--amber, #F59E0B) 45%, transparent)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 14, color: textPrimary }}>
+                  <span aria-hidden style={{ fontSize: 16 }}>🔞</span> Adults only (18+)
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.5, color: textMuted }}>
+                  Adding <b style={{ color: textPrimary }}>“{pendingMatureVibe}”</b> makes this an adult squad — it’ll only be matched with other squads whose members have confirmed they’re 18+. Keep it consensual and follow the community rules.
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => { const v = pendingMatureVibe; setPendingMatureVibe(null); if (v) commitVibe(v); }}
+                    className="gg-press"
+                    style={{ flex: 1, minHeight: 40, borderRadius: 10, border: "none", background: "var(--accent, var(--violet))", color: "var(--on-accent, #fff)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    I’m 18+ — add it
+                  </button>
+                  <button
+                    onClick={() => setPendingMatureVibe(null)}
+                    style={{ flex: 1, minHeight: 40, borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: textMuted, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             {(() => {
               const q = vibeSearch.trim().toLowerCase();
               const all = Array.from(new Set([...selectedVibes, ...customVibes, ...CURATED_VIBES]));
               const filtered = q ? all.filter(v => v.toLowerCase().includes(q)) : all;
               const exact = all.some(v => v.toLowerCase() === q);
-              const canCreate = q.length > 0 && !exact && selectedVibes.length < MAX_VIBES;
+              const canCreate = q.length > 0 && !exact && selectedVibes.length < MAX_VIBES && !pendingMatureVibe && !vibeWarning;
               return (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 200, overflowY: "auto" }}>
                   {canCreate && (
