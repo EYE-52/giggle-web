@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Theme registry — ONE entry here + one [data-theme] CSS block in
@@ -65,8 +66,10 @@ export function ThemeToggle({ size = 44 }: { size?: number }) {
   const [theme, setTheme] = useState<ThemeId>("dark");
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
@@ -74,11 +77,31 @@ export function ThemeToggle({ size = 44 }: { size?: number }) {
     if (t && THEMES.some((x) => x.id === t)) setTheme(t);
   }, []);
 
+  // Position the portaled menu under the trigger; recompute on open, and close
+  // on scroll/resize so it never floats detached from a moved trigger.
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = btnRef.current?.getBoundingClientRect();
+      if (r) setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+    };
+    place();
+    const onScrollResize = () => setOpen(false);
+    window.addEventListener("resize", onScrollResize);
+    window.addEventListener("scroll", onScrollResize, true);
+    return () => {
+      window.removeEventListener("resize", onScrollResize);
+      window.removeEventListener("scroll", onScrollResize, true);
+    };
+  }, [open]);
+
   // Close on outside click / Escape while open.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (wrapRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -166,17 +189,18 @@ export function ThemeToggle({ size = 44 }: { size?: number }) {
         </svg>
       </button>
 
-      {open && (
+      {open && pos && typeof document !== "undefined" && createPortal(
         <div
+          ref={menuRef}
           role="menu"
           aria-label="Choose theme"
           className="gg-reveal"
           onKeyDown={onMenuKeyDown}
           style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            right: 0,
-            zIndex: 70,
+            position: "fixed",
+            top: pos.top,
+            right: pos.right,
+            zIndex: 1300,
             minWidth: 178,
             padding: 6,
             background: "var(--surface)",
@@ -227,7 +251,8 @@ export function ThemeToggle({ size = 44 }: { size?: number }) {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
