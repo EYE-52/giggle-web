@@ -123,6 +123,28 @@ export function SquadPreview({
     }
   }, [squad, onJoined, router]);
 
+  // Am I already in this squad? Then Join makes no sense — offer Open + Leave.
+  const myUserId = session.user?.id;
+  const isMember = !!myUserId && members.some(m => m.userId === myUserId);
+  const [leaving, setLeaving] = useState(false);
+
+  const openLobby = useCallback(() => {
+    router.push(`/lobby?squad=${squad.squadId}`);
+  }, [router, squad.squadId]);
+
+  const handleLeave = useCallback(async () => {
+    setError(null);
+    setLeaving(true);
+    try {
+      await api.leaveSquad(squad.squadId);
+      onJoined(null, false); // let the parent refresh its lists
+      onClose();
+    } catch (e: unknown) {
+      setError((e as { message?: string })?.message || "Couldn't leave that squad. Try again.");
+      setLeaving(false);
+    }
+  }, [squad.squadId, onJoined, onClose]);
+
   const text = "var(--text)";
   const muted = "var(--text-muted)";
 
@@ -357,6 +379,43 @@ export function SquadPreview({
                   <span>{error}</span>
                 </div>
               )}
+              {isMember ? (
+                // Already a member → Open the lobby, or Leave the squad.
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <button
+                    onClick={openLobby}
+                    onMouseEnter={() => setBtnHover(true)}
+                    onMouseLeave={() => setBtnHover(false)}
+                    className="gg-press"
+                    style={{
+                      width: "100%", height: 50, borderRadius: 999, border: "none", cursor: "pointer",
+                      background: btnHover ? "var(--violet-bright)" : "var(--violet)", color: "var(--on-accent)",
+                      fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em",
+                      boxShadow: btnHover ? "0 0 36px -8px rgba(118,87,255,0.95)" : "0 0 24px -10px rgba(118,87,255,0.8)",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      transform: btnHover ? "translateY(-1px)" : "translateY(0)",
+                      transition: "transform .14s ease, box-shadow .2s var(--ease-ui), background .2s var(--ease-ui)",
+                    }}
+                  >
+                    <Icon.enter size={16} color="var(--on-accent)" /> Open lobby
+                  </button>
+                  <button
+                    onClick={handleLeave}
+                    disabled={leaving}
+                    className="gg-press"
+                    style={{
+                      width: "100%", height: 46, borderRadius: 999,
+                      border: "1px solid color-mix(in srgb, var(--coral) 40%, transparent)",
+                      background: "transparent", color: "var(--coral)", cursor: leaving ? "wait" : "pointer",
+                      fontFamily: "var(--font-body)", fontWeight: 700, fontSize: 14,
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      opacity: leaving ? 0.7 : 1, transition: "opacity .15s ease",
+                    }}
+                  >
+                    {leaving ? (<><span className="gg-spinner" /> Leaving…</>) : "Leave squad"}
+                  </button>
+                </div>
+              ) : (
               <button
                 onClick={handleJoin}
                 disabled={joining || isFull}
@@ -382,6 +441,7 @@ export function SquadPreview({
                     ? (<><span className="gg-spinner" /> {isRequest ? "Sending request…" : "Joining…"}</>)
                     : (<><Icon.enter size={16} color="var(--on-accent)" /> {isRequest ? "Request to join" : "Join squad"}</>)}
               </button>
+              )}
             </>
           )}
         </div>
