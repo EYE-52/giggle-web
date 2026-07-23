@@ -480,7 +480,7 @@ export default function LandingPage() {
                 </Reveal>
                 <Reveal delay={160}>
                   <p style={{ fontSize: isPhone ? 17 : 20, lineHeight: 1.55, color: C.body, margin: "26px 0 0", maxWidth: 470 }}>
-                    Giggle Meet pairs your crew with another crew over live group video — matched by your vibe. No awkward 1-on-1s. Just your people, meeting new people.
+                    Giggle Meet pairs your crew with another crew over live group video — matched by your vibe. No awkward solo chats. Just your people, meeting new people.
                   </p>
                 </Reveal>
                 <Reveal delay={240}>
@@ -533,14 +533,14 @@ export default function LandingPage() {
           <div style={{ position: "relative", maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
             <Reveal>
               <h2
-                aria-label="Meeting people online 1-on-1 is awkward. Bring your friends."
+                aria-label="Meeting strangers online is awkward. Better with your squad."
                 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: isPhone ? "clamp(34px,9vw,44px)" : 68, lineHeight: 1.04, letterSpacing: "-.035em", margin: 0 }}
               >
                 <span aria-hidden="true">
-                  Meeting people online 1-on-1 is{" "}
+                  Meeting strangers online is{" "}
                   <span style={{ color: C.dim, textDecoration: "line-through", textDecorationColor: C.pink, textDecorationThickness: 3 }}>awkward</span>.
                   <br />
-                  <span style={shimmerText}>Bring your friends.</span>
+                  <span style={shimmerText}>Better with your squad.</span>
                 </span>
               </h2>
             </Reveal>
