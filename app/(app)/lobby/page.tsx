@@ -11,7 +11,7 @@ import { InviteToSquad } from "@/components/InviteToSquad";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
-import { api, connectSocket, SOCKET_EVENTS, session, getMyAvatar, subscribeAvatar, subscribeChat, joinChat, DEFAULT_AVATAR_ID, classifyVibe } from "@giggle/core";
+import { api, connectSocket, SOCKET_EVENTS, session, getMyAvatar, subscribeAvatar, subscribeChat, joinChat, DEFAULT_AVATAR_ID, classifyVibe, tagsAreMature } from "@giggle/core";
 import { coverKind, coverBackground, fallbackGradient } from "@/components/covers";
 import type { SquadState, JoinRequestUser } from "@giggle/core";
 import { createVideoClient } from "@giggle/agora";
@@ -172,6 +172,9 @@ function LobbyInner() {
   // 18+ confirmation for adult vibes (which turns the squad into an adult room).
   const [vibeWarning, setVibeWarning] = useState<string | null>(null);
   const [pendingMatureVibe, setPendingMatureVibe] = useState<string | null>(null);
+  // Non-adults can't create adult rooms: they confirmed a DOB at signup, so we
+  // trust session.isAdult and hard-block instead of offering an 18+ opt-in.
+  const [matureBlocked, setMatureBlocked] = useState<string | null>(null);
   function commitVibe(v: string) {
     const lower = v.toLowerCase();
     if (selectedVibes.some(x => x.toLowerCase() === lower)) { setVibeSearch(""); return; }
@@ -189,13 +192,19 @@ function LobbyInner() {
     const v = raw.trim().replace(/\s+/g, " ");
     if (!v || v.length > 24) return;
     setVibeWarning(null);
+    setMatureBlocked(null);
     const verdict = classifyVibe(v);
     if (verdict === "blocked") {
       setVibeWarning("That vibe isn't allowed. Try something that keeps Giggle welcoming for everyone.");
       return;
     }
     if (verdict === "mature") {
-      // Don't add silently — surface the 18+ gate first.
+      // Adult vibe → turns the squad into an adult room. Minors (per their
+      // signup DOB) are hard-blocked; adults get the confirm-first flow.
+      if (!session.isAdult) {
+        setMatureBlocked(v);
+        return;
+      }
       setPendingMatureVibe(v);
       return;
     }
@@ -702,6 +711,23 @@ function LobbyInner() {
   }
 
   const currentTags = normalizeVibeLabels(squad.tags?.length ? squad.tags : ["🎮 Gaming", "🌙 Late Night", "🎵 Music"]);
+  // Adult room? Any of the squad's real tags is a mature vibe. Drives the 18+ badge.
+  const squadIsAdult = tagsAreMature(squad.tags ?? []);
+  const adultBadge = (
+    <span
+      title="Adult squad — 18+ vibes"
+      aria-label="18 plus, adult squad"
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0,
+        background: "var(--coral-soft, rgba(255,92,92,0.14))",
+        color: "var(--coral-text, var(--coral, #FF5C5C))",
+        border: "1px solid color-mix(in srgb, var(--coral, #FF5C5C) 40%, transparent)",
+        borderRadius: 999, padding: "2px 9px", fontSize: 12, fontWeight: 700, letterSpacing: "0.02em",
+      }}
+    >
+      <span aria-hidden>🔞</span> 18+
+    </span>
+  );
 
   // ── Squad cover identity ──────────────────────────────────────────────
   // hasCover: leader has explicitly chosen a cover. When absent we fall back to
@@ -759,8 +785,11 @@ function LobbyInner() {
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {coverThumb(38)}
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 14, fontWeight: 700, color: textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {squad.squadName}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 14, fontWeight: 700, color: textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {squad.squadName}
+            </div>
+            {squadIsAdult && adultBadge}
           </div>
           <div style={{ fontSize: 12, fontWeight: 700, color: textTertiary, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>Squad Info</div>
         </div>
@@ -1245,6 +1274,7 @@ function LobbyInner() {
               borderRadius: 999, padding: "2px 10px", fontFamily: "monospace",
               fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", flexShrink: 0,
             }}>{squad.squadCode}</span>
+            {squadIsAdult && adultBadge}
           </div>
 
           {/* Vibe tags */}
@@ -2237,6 +2267,27 @@ function LobbyInner() {
               </div>
             )}
 
+            {/* Moderation: minors can't create adult rooms (trusts signup DOB). */}
+            {matureBlocked && (
+              <div role="alert" aria-label="Adults only" style={{
+                display: "flex", flexDirection: "column", gap: 8, padding: "14px 14px", borderRadius: 12,
+                background: "var(--coral-soft, rgba(255,92,92,0.12))", border: "1px solid color-mix(in srgb, var(--coral, #FF5C5C) 45%, transparent)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 14, color: textPrimary }}>
+                  <span aria-hidden style={{ fontSize: 16 }}>🔞</span> Adults only — you must be 18+ to add this vibe
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.5, color: textMuted }}>
+                  <b style={{ color: textPrimary }}>“{matureBlocked}”</b> would make this an adult squad. Your account isn&apos;t marked 18+, so you can&apos;t add it.
+                </div>
+                <button
+                  onClick={() => setMatureBlocked(null)}
+                  style={{ alignSelf: "flex-start", minHeight: 36, padding: "0 14px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: textMuted, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                >
+                  Got it
+                </button>
+              </div>
+            )}
+
             {/* Moderation: 18+ age gate for adult vibes */}
             {pendingMatureVibe && (
               <div role="alertdialog" aria-label="Adult vibe confirmation" style={{
@@ -2255,7 +2306,7 @@ function LobbyInner() {
                     className="gg-press"
                     style={{ flex: 1, minHeight: 40, borderRadius: 10, border: "none", background: "var(--accent, var(--violet))", color: "var(--on-accent, #fff)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
                   >
-                    I’m 18+ — add it
+                    Add it
                   </button>
                   <button
                     onClick={() => setPendingMatureVibe(null)}
@@ -2272,7 +2323,7 @@ function LobbyInner() {
               const all = Array.from(new Set([...selectedVibes, ...customVibes, ...CURATED_VIBES]));
               const filtered = q ? all.filter(v => v.toLowerCase().includes(q)) : all;
               const exact = all.some(v => v.toLowerCase() === q);
-              const canCreate = q.length > 0 && !exact && selectedVibes.length < MAX_VIBES && !pendingMatureVibe && !vibeWarning;
+              const canCreate = q.length > 0 && !exact && selectedVibes.length < MAX_VIBES && !pendingMatureVibe && !matureBlocked && !vibeWarning;
               return (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 200, overflowY: "auto" }}>
                   {canCreate && (

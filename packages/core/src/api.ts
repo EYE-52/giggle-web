@@ -20,6 +20,10 @@ export const api = {
     backendRequest<UserProfile>("/api/me/profile"),
   updateMyProfile: (body: { gender?: string; age?: number | null; languages?: string[]; country?: string }) =>
     backendRequest<UserProfile>("/api/me/profile", { method: "PATCH", body }),
+  // Self-attested date of birth (set-once). Raw birthDate never comes back — the
+  // backend derives and returns only the boolean gates. 409 if already set.
+  setAge: (birthDate: string) =>
+    backendRequest<{ isAdult: boolean; ageConfirmed: boolean }>("/api/me/age", { method: "POST", body: { birthDate } }),
 
   // --- squads ---
   createSquad: (body: { squadName?: string; displayName?: string; tags?: string[] }) =>
@@ -183,6 +187,12 @@ export interface BackendUser {
   image?: string;
   isPremium: boolean;
   isApproved: boolean;
+  /** Age gating (self-attested DOB at signup). Raw birthDate is NOT sent to the
+   *  client — only these derived booleans. `ageConfirmed` = the user has set a
+   *  DOB; `isAdult` = that DOB is 18+; `ageVerified` = hard-verified (future). */
+  isAdult?: boolean;
+  ageConfirmed?: boolean;
+  ageVerified?: boolean;
   /** Referral & wallet (present from /api/auth/exchange) */
   referralCode?: string;
   referralCount?: number;

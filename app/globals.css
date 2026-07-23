@@ -176,9 +176,11 @@
   --live-contrast: #0B0B12;
   --live-soft: rgba(163,230,53,0.13);
   --ease-spring: var(--ease-out);
-  /* Video stage stays dark in every theme (not overridden below). */
-  --stage: #1B1420;
-  --stage-2: #2A2135;
+  /* Video stage stays dark in every theme (not overridden below).
+     Neutral near-black "screen" tone — not plum — so tiles read as real
+     video placeholders on light themes too. */
+  --stage: #101013;
+  --stage-2: #1B1B20;
   color-scheme: dark;
 }
 

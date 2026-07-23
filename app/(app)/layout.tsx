@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/Toast";
 import { Logomark } from "@/components/Brand";
 import { useViewport } from "@/components/useViewport";
 import { session, connectSocket } from "@giggle/core";
+import { AgeGate } from "@/components/AgeGate";
 
 const CALLING_ROUTES = ["/lobby", "/encounter", "/matchmaking", "/match"];
 
@@ -15,6 +16,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isCalling = CALLING_ROUTES.some((r) => pathname === r);
   const { isPhone } = useViewport();
   const [authReady, setAuthReady] = useState(false);
+  // Age gate: once auth is ready, block the app until the user has attested a
+  // date of birth. `ageConfirmed` is undefined until the backend ships /api/me/age
+  // (or for fresh devSignIn users) — treat anything other than an explicit true
+  // as "not confirmed" so the gate shows. Cleared once AgeGate reports success.
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   // Auth gate: the whole (app) area requires a session. In production the only
   // way in is real OAuth — unauthenticated users are sent to /signin. In local
@@ -24,13 +30,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     async function ensureSession() {
       if (session.isAuthed()) {
-        if (!cancelled) setAuthReady(true);
+        if (!cancelled) {
+          setAgeConfirmed(session.ageConfirmed);
+          setAuthReady(true);
+        }
         return;
       }
       if (process.env.NODE_ENV !== "production") {
         try {
           await session.devSignIn();
-          if (!cancelled) setAuthReady(true);
+          if (!cancelled) {
+            setAgeConfirmed(session.ageConfirmed);
+            setAuthReady(true);
+          }
         } catch {
           if (!cancelled) router.replace("/signin");
         }
@@ -79,6 +91,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // Blocking age gate — stands in front of the whole app until a DOB is set.
+  if (!ageConfirmed) {
+    return (
+      <ToastProvider>
+        <AgeGate onDone={() => setAgeConfirmed(true)} />
+      </ToastProvider>
     );
   }
 
