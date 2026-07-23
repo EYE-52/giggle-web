@@ -6,6 +6,7 @@ import { AvatarArt } from "@/components/AvatarArt";
 import { Icon } from "@/components/Icons";
 import { ChatPanel } from "@/components/ChatPanel";
 import { CoverPicker } from "@/components/CoverPicker";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { InviteToSquad } from "@/components/InviteToSquad";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
@@ -15,6 +16,7 @@ import { coverKind, coverBackground, fallbackGradient } from "@/components/cover
 import type { SquadState, JoinRequestUser } from "@giggle/core";
 import { createVideoClient } from "@giggle/agora";
 import { useViewport } from "@/components/useViewport";
+import { useTheme } from "@/components/useTheme";
 
 const CURATED_VIBES = ["Gaming", "Music", "Chill", "Comedy", "Deep Talks", "Late Night", "Sports", "Art", "Study", "Hype", "Fitness", "Foodies"];
 
@@ -68,50 +70,52 @@ const KEYFRAMES = `
 }
 
 /* ── PREMIUM MICRO-INTERACTION SPEC (shared) ─────────────────────────────
-   Tactile press feedback for every control. Scoped to the dark calling root
-   so we never leak into other surfaces. Press uses !important to beat inline
-   hover transforms; cubic-bezier easing for a satisfying spring-out. */
-[data-theme="dark"] button:not(:disabled) {
+   Tactile press feedback for every control. Scoped to the lobby root class
+   (NOT a theme) so it applies in every theme and never leaks elsewhere.
+   Press uses !important to beat inline hover transforms; cubic-bezier easing
+   for a satisfying spring-out. */
+.gg-lobby-root button:not(:disabled) {
   -webkit-tap-highlight-color: transparent;
   transition: transform .14s cubic-bezier(.22,1,.36,1), box-shadow .2s cubic-bezier(.4,0,.2,1), background .2s cubic-bezier(.4,0,.2,1), color .2s cubic-bezier(.4,0,.2,1), border-color .2s cubic-bezier(.4,0,.2,1), filter .2s cubic-bezier(.4,0,.2,1);
 }
-[data-theme="dark"] button:not(:disabled):active {
+.gg-lobby-root button:not(:disabled):active {
   transform: scale(.94) !important;
   transition-duration: .06s;
 }
-[data-theme="dark"] button:disabled {
+.gg-lobby-root button:disabled {
   cursor: not-allowed;
 }
-[data-theme="dark"] button:focus-visible,
-[data-theme="dark"] [role="button"]:focus-visible,
-[data-theme="dark"] input:focus-visible {
+.gg-lobby-root button:focus-visible,
+.gg-lobby-root [role="button"]:focus-visible,
+.gg-lobby-root input:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #0B0B0F, 0 0 0 4px var(--violet, #7C5CFF);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent, var(--violet, #7C5CFF));
 }
-[data-theme="dark"] [role="button"] { -webkit-tap-highlight-color: transparent; }
-[data-theme="dark"] [role="button"]:active { transform: scale(.97); }
-[data-theme="dark"] input {
+.gg-lobby-root [role="button"] { -webkit-tap-highlight-color: transparent; }
+.gg-lobby-root [role="button"]:active { transform: scale(.97); }
+.gg-lobby-root input {
   transition: border-color .18s cubic-bezier(.4,0,.2,1), box-shadow .18s cubic-bezier(.4,0,.2,1), background .18s cubic-bezier(.4,0,.2,1);
 }
-[data-theme="dark"] input:focus {
-  border-color: var(--violet, #7C5CFF) !important;
+.gg-lobby-root input:focus {
+  border-color: var(--accent, var(--violet, #7C5CFF)) !important;
   box-shadow: 0 0 0 3px rgba(124,92,255,0.22);
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-theme="dark"] *,
-  [data-theme="dark"] *::before,
-  [data-theme="dark"] *::after {
+  .gg-lobby-root *,
+  .gg-lobby-root *::before,
+  .gg-lobby-root *::after {
     animation-duration: .001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .001ms !important;
   }
-  [data-theme="dark"] button:not(:disabled):active,
-  [data-theme="dark"] [role="button"]:active { transform: none !important; }
+  .gg-lobby-root button:not(:disabled):active,
+  .gg-lobby-root [role="button"]:active { transform: none !important; }
 }
 `;
 
 function LobbyInner() {
   const { isPhone, isNarrow } = useViewport();
+  const themeId = useTheme();
   const router = useRouter();
   const params = useSearchParams();
   const squadId = params.get("squad") ?? "";
@@ -238,13 +242,17 @@ function LobbyInner() {
   const lime = "var(--lime)";
   const limeText = "var(--lime-text)";
   const coral = "var(--coral)";
-  // ── ON-STAGE text tiers ─────────────────────────────────────────────────
-  // The lobby is "the studio": stage-dark in EVERY theme. These are pinned
-  // literals (not theme vars) so nothing inside the room flips with themes.
-  const textPrimary = "#F4F3F7";
-  const textMuted = "#C9C9DA";
-  const textTertiary = "#9A9AB0";
-  const ON_STAGE_HAIRLINE = "rgba(255,255,255,0.08)";
+  // ── CHROME text tiers ───────────────────────────────────────────────────
+  // The lobby now RESPECTS THE ACTIVE THEME (Meet/Zoom light-mode model): the
+  // room chrome + canvas adopt theme tokens; only the video TILES stay dark.
+  // These drive header / sidebar / control-bar / modal text, so they are theme
+  // tokens (light in Cloud, plum in Midnight, ink in Tangerine). Tile-internal
+  // text keeps its own light-on-dark literals inline (do NOT theme those).
+  const textPrimary = "var(--text)";
+  const textMuted = "var(--text-body)";
+  const textTertiary = "var(--text-muted)";
+  // Chrome hairline (header / sidebar / panels) — themed, not a stage literal.
+  const ON_STAGE_HAIRLINE = "var(--border)";
 
   async function fetchSquad() {
     if (!squadId) return;
@@ -669,11 +677,10 @@ function LobbyInner() {
   // a deterministic per-squad gradient so the squad still feels themed. Both
   // resolve to a CSS `background` value ready for inline styles.
   const hasCover = !!squad.coverImage;
-  // The lobby stage is dark in EVERY theme, so covers ALWAYS render in their
-  // dark variant here (never the bright pastel twins light themes use on the
-  // dashboard) — otherwise light themes get white scrims + pastel gradients
-  // bleeding into the dark room.
-  const coverStyleKind = coverKind(squad.coverImage, "dark");
+  // The header is now themed, so covers follow the ACTIVE theme again (bright
+  // pastel twins in light themes, moody variants in Midnight) — same
+  // theme-aware resolution the dashboard uses. Photos keep their dark scrim.
+  const coverStyleKind = coverKind(squad.coverImage, themeId);
   const coverBg = hasCover
     ? coverBackground(squad.coverImage, coverStyleKind)
     : fallbackGradient(squad.squadId || squad.squadName, coverStyleKind);
@@ -985,9 +992,9 @@ function LobbyInner() {
     }}>
       <div style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 13, fontWeight: 700, color: textPrimary, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>Invite Code</div>
       <div style={{
-        background: "var(--stage, #1B1420)", border: "1px solid rgba(255,255,255,0.12)",
+        background: "var(--surface-2)", border: "1px solid var(--border)",
         borderRadius: 10, padding: "10px 12px",
-        fontFamily: "monospace", fontSize: 22, fontWeight: 700, color: "#F4F3F7",
+        fontFamily: "monospace", fontSize: 22, fontWeight: 700, color: "var(--text)",
         letterSpacing: "0.14em", textAlign: "center" as const,
       }}>
         {squad.squadCode}
@@ -1017,7 +1024,7 @@ function LobbyInner() {
   );
 
   const infoPanel = (
-    <div style={{ background: "var(--stage-2, #2A2135)", border: `1px solid ${ON_STAGE_HAIRLINE}`, borderRadius: 14, overflow: "hidden" }}>
+    <div style={{ background: "var(--surface)", border: `1px solid ${ON_STAGE_HAIRLINE}`, borderRadius: 14, overflow: "hidden" }}>
       {infoCard}
       {inviteCard}
     </div>
@@ -1034,17 +1041,18 @@ function LobbyInner() {
   return (
     <>
       <style>{KEYFRAMES}</style>
-      {/* Full calling layout: flex column filling viewport. The calling experience
-          stays DARK in both themes (like every video app) so the stage and the
-          floating side panel share one uniform background — no light/dark seam. */}
-      <div data-theme="dark" style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--stage, #1B1420)", overflow: "hidden" }}>
+      {/* Full calling layout: flex column filling viewport. The room chrome +
+          canvas RESPECT the active theme (Meet/Zoom light-mode model); only the
+          video tiles stay dark. `.gg-lobby-root` scopes the press micro-
+          interactions to this subtree in every theme. */}
+      <div className="gg-lobby-root" style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--bg)", overflow: "hidden" }}>
 
         {/* ── COMPACT HEADER — themed with the squad's own cover ── */}
         <div style={{
           position: "relative",
           display: "flex", alignItems: "center", gap: 12,
           padding: isPhone ? "8px 10px" : "12px 20px",
-          background: "var(--stage, #1B1420)",
+          background: "var(--surface)",
           borderBottom: `1px solid ${ON_STAGE_HAIRLINE}`,
           backdropFilter: "blur(12px)",
           flexShrink: 0,
@@ -1061,15 +1069,16 @@ function LobbyInner() {
               background: coverBg, backgroundSize: "cover", backgroundPosition: "center",
               opacity: 0.42,
             }} />
-            {/* Legibility scrim: darker toward the left where name/code sit, and a
-                bottom-up wash so text never fights the cover. */}
+            {/* Legibility scrim: themed wash (var(--surface)) toward the left where
+                name/code sit, so the header reads as this squad's cover tint while
+                staying legible in EVERY theme (light in Cloud, plum in Midnight). */}
             <div style={{
               position: "absolute", inset: 0,
-              background: "linear-gradient(90deg, rgba(11,11,15,0.92) 0%, rgba(11,11,15,0.72) 45%, rgba(11,11,15,0.5) 100%)",
+              background: "linear-gradient(90deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 74%, transparent) 45%, color-mix(in srgb, var(--surface) 52%, transparent) 100%)",
             }} />
             <div style={{
               position: "absolute", inset: 0,
-              background: "linear-gradient(180deg, rgba(11,11,15,0.35) 0%, rgba(11,11,15,0.55) 100%)",
+              background: "linear-gradient(180deg, color-mix(in srgb, var(--surface) 32%, transparent) 0%, color-mix(in srgb, var(--surface) 54%, transparent) 100%)",
             }} />
           </div>
 
@@ -1174,13 +1183,13 @@ function LobbyInner() {
                       transition: "all .15s ease",
                     }}
                   >
-                    <Icon.settings size={12} color={renameHovered ? violet : textMuted} />
+                    <Icon.edit size={13} color={renameHovered ? violet : textMuted} />
                   </button>
                 )}
               </>
             )}
             <span style={{
-              background: "rgba(255,255,255,0.08)", color: "#F4F3F7", border: "1px solid rgba(255,255,255,0.14)",
+              background: "var(--surface-2)", color: "var(--text)", border: "1px solid var(--border)",
               borderRadius: 999, padding: "2px 10px", fontFamily: "monospace",
               fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", flexShrink: 0,
             }}>{squad.squadCode}</span>
@@ -1217,6 +1226,9 @@ function LobbyInner() {
 
           {/* Right actions */}
           <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            {/* Theme switcher — the shared TopNav is hidden on lobby/encounter, so
+                surface the theme menu here too (keeps all themes reachable in-squad). */}
+            <ThemeToggle size={isPhone ? 44 : 34} />
             {isLeader && !isNarrow && (
               <button
                 onClick={() => setCoverPickerOpen(true)}
@@ -1264,7 +1276,7 @@ function LobbyInner() {
                 <span style={{
                   position: "absolute", top: -3, right: -3,
                   minWidth: 8, height: 8, borderRadius: 999,
-                  background: "var(--coral)", border: "1.5px solid var(--stage, #1B1420)",
+                  background: "var(--coral)", border: "1.5px solid var(--surface)",
                 }} />
               )}
             </button>
@@ -1305,11 +1317,11 @@ function LobbyInner() {
         {/* ── MAIN AREA: stage + side panel ── */}
         <div style={{ display: "flex", flexDirection: isPhone ? "column" : "row" as const, flex: 1, minHeight: 0, overflow: isPhone ? "auto" : "hidden" }}>
 
-          {/* ── VIDEO STAGE — stays dark in both themes ── */}
+          {/* ── VIDEO STAGE — themed canvas; only the tiles on it stay dark ── */}
           <div style={{
             flex: isPhone ? "0 0 auto" : 1, display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
-            background: "var(--stage-2, #2A2135)",
+            background: "var(--bg)",
             position: "relative",
             padding: isPhone ? "10px 10px 12px" : "24px 24px 16px",
             minHeight: isPhone ? 320 : 0,
@@ -1324,11 +1336,13 @@ function LobbyInner() {
                 position: "absolute", inset: 0,
                 background: coverBg,
                 backgroundSize: "cover", backgroundPosition: "center",
-                opacity: 0.2,
+                opacity: 0.14,
               }} />
+              {/* Vignette that fades the cover into the THEMED canvas (var(--bg))
+                  so the ambient identity works in light + dark themes alike. */}
               <div style={{
                 position: "absolute", inset: 0,
-                background: "radial-gradient(ellipse at 50% 40%, rgba(11,11,15,0.55) 0%, rgba(11,11,15,0.88) 70%, #0B0B0F 100%)",
+                background: "radial-gradient(ellipse at 50% 40%, transparent 0%, color-mix(in srgb, var(--bg) 62%, transparent) 55%, var(--bg) 100%)",
               }} />
             </div>
             {/* Video failure banner — non-blocking, dismissible. Chat/controls
@@ -1338,7 +1352,7 @@ function LobbyInner() {
                 position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
                 zIndex: 30, maxWidth: "calc(100% - 24px)",
                 display: "flex", alignItems: "center", gap: 10,
-                background: "var(--stage-2, #2A2135)",
+                background: "var(--surface)",
                 backgroundImage: "linear-gradient(var(--coral-soft), var(--coral-soft))",
                 border: "1px solid color-mix(in srgb, var(--coral) 38%, transparent)",
                 borderRadius: 12, padding: "9px 12px 9px 14px",
@@ -1370,7 +1384,7 @@ function LobbyInner() {
                 position: "absolute", top: videoError ? 64 : 12, left: "50%", transform: "translateX(-50%)",
                 zIndex: 30, maxWidth: "calc(100% - 24px)",
                 display: "flex", alignItems: "center", gap: 10,
-                background: "var(--stage-2, #2A2135)",
+                background: "var(--surface)",
                 border: "1px solid color-mix(in srgb, var(--amber) 45%, transparent)",
                 borderRadius: 12, padding: "9px 12px 9px 14px",
                 boxShadow: "0 8px 28px rgba(0,0,0,0.35)",
@@ -1412,10 +1426,11 @@ function LobbyInner() {
                 <span style={{
                   fontFamily: "var(--font-display, var(--font-space-grotesk))", fontSize: 13, fontWeight: 600,
                   letterSpacing: "0.04em",
-                  background: "linear-gradient(90deg, #C9C9DA 0%, #C9C9DA 38%, #F4F4F7 50%, #C9C9DA 62%, #C9C9DA 100%)",
+                  // Themed shimmer so it reads on the themed canvas in every theme.
+                  background: "linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 38%, var(--text) 50%, var(--text-muted) 62%, var(--text-muted) 100%)",
                   backgroundSize: "220% auto",
                   WebkitBackgroundClip: "text", backgroundClip: "text",
-                  WebkitTextFillColor: "transparent", color: "#C9C9DA",
+                  WebkitTextFillColor: "transparent", color: "var(--text-muted)",
                   animation: "lobbyShimmer 2.8s linear infinite",
                 }}>
                   Waiting for your squad…
@@ -1630,8 +1645,9 @@ function LobbyInner() {
                   onMouseLeave={() => setInviteTileHovered(false)}
                   style={{
                     borderRadius: "var(--radius-tile, 16px)",
+                    // Placeholder is a dark "screen" like the video tiles in every theme.
                     border: `1.5px dashed ${inviteTileHovered ? "var(--accent, var(--violet))" : "rgba(255,255,255,0.12)"}`,
-                    background: inviteTileHovered ? "var(--violet-soft)" : "rgba(255,255,255,0.015)",
+                    background: inviteTileHovered ? "color-mix(in srgb, var(--accent, var(--violet)) 24%, var(--stage-2, #2A2135))" : "var(--stage-2, #2A2135)",
                     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
                     boxSizing: "border-box",
                     width: "100%",
@@ -1645,7 +1661,7 @@ function LobbyInner() {
                 >
                   <Icon.plus size={22} color={inviteTileHovered ? "var(--accent, var(--violet))" : "#9A9AB0"} />
                   <div style={{ fontSize: 13, fontWeight: 600, color: inviteTileHovered ? "var(--accent, var(--violet))" : "#9A9AB0" }}>Invite a friend</div>
-                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{MAX_SLOTS - memberCount} {MAX_SLOTS - memberCount === 1 ? "spot" : "spots"} open</div>
+                  <div style={{ fontSize: 12, color: "#7B7B90" }}>{MAX_SLOTS - memberCount} {MAX_SLOTS - memberCount === 1 ? "spot" : "spots"} open</div>
                 </div>
               )}
 
@@ -1654,9 +1670,9 @@ function LobbyInner() {
             {/* ── CONTROL BAR (centered floating pill) ── */}
             <div data-testid="lobby-readiness" style={{
               display: "flex", alignItems: "center", justifyContent: "center" as const, gap: 10,
-              background: "rgba(22,22,30,0.92)",
+              background: "var(--surface)",
               backdropFilter: "blur(16px)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              border: "1px solid var(--border)",
               borderRadius: "var(--radius-card, 20px)",
               padding: isPhone ? "8px 10px" : "10px 16px",
               marginTop: isPhone ? 0 : 32,
@@ -1685,16 +1701,16 @@ function LobbyInner() {
                     style={{
                       width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: "var(--radius-control, 14px)", border: "none", cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      /* On = neutral glass, off = coral. Green stays reserved for READY. */
+                      /* On = themed neutral, off = coral. Green stays reserved for READY. */
                       background: micOn
-                        ? (micHovered ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.12)")
+                        ? (micHovered ? "var(--overlay-hover)" : "var(--surface-2)")
                         : (micHovered ? "color-mix(in srgb, var(--coral) 90%, transparent)" : "var(--coral)"),
-                      boxShadow: micOn ? "inset 0 0 0 1px rgba(255,255,255,0.18)" : "none",
+                      boxShadow: micOn ? "inset 0 0 0 1px var(--border-strong)" : "none",
                       transition: "all .15s ease",
                       transform: micHovered ? "scale(1.08)" : "scale(1)",
                     }}
                   >
-                    <Icon.mic size={20} color="#fff" />
+                    <Icon.mic size={20} color={micOn ? "var(--text)" : "#fff"} />
                   </button>
                   <button
                     onClick={toggleCam}
@@ -1708,16 +1724,16 @@ function LobbyInner() {
                       width: isPhone ? 44 : 50, height: isPhone ? 44 : 50, borderRadius: "var(--radius-control, 14px)", border: "none", cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       background: camOn
-                        ? (camHovered ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.12)")
+                        ? (camHovered ? "var(--overlay-hover)" : "var(--surface-2)")
                         : (camHovered ? "color-mix(in srgb, var(--coral) 90%, transparent)" : "var(--coral)"),
-                      boxShadow: camOn ? "inset 0 0 0 1px rgba(255,255,255,0.18)" : "none",
+                      boxShadow: camOn ? "inset 0 0 0 1px var(--border-strong)" : "none",
                       transition: "all .15s ease",
                       transform: camHovered ? "scale(1.08)" : "scale(1)",
                     }}
                   >
-                    <Icon.cam size={20} color="#fff" />
+                    <Icon.cam size={20} color={camOn ? "var(--text)" : "#fff"} />
                   </button>
-                  <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.1)", margin: "0 2px" }} />
+                  <div style={{ width: 1, height: 28, background: "var(--border)", margin: "0 2px" }} />
                 </>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flex: isPhone ? "1 0 100%" : undefined }}>
@@ -1769,7 +1785,7 @@ function LobbyInner() {
               {/* Find a Match (leader only) */}
               {isLeader && (
                 <>
-                  {!isPhone && <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.1)", margin: "0 2px" }} />}
+                  {!isPhone && <div style={{ width: 1, height: 28, background: "var(--border)", margin: "0 2px" }} />}
                   <Button
                     onClick={handleFindMatch}
                     disabled={!allReady}
@@ -1839,7 +1855,7 @@ function LobbyInner() {
               maxHeight: "45vh",
               display: "flex",
               flexDirection: "column",
-              background: "var(--stage-2, #2A2135)",
+              background: "var(--surface)",
               borderTop: `1px solid ${ON_STAGE_HAIRLINE}`,
               margin: 0,
               overflowY: "auto",
@@ -1849,7 +1865,7 @@ function LobbyInner() {
               {infoPanel}
               {chatOpen && (
                 <div style={{
-                  background: "var(--stage-2, #2A2135)",
+                  background: "var(--surface)",
                   border: `1px solid ${ON_STAGE_HAIRLINE}`,
                   borderRadius: 16,
                   overflow: "hidden",
@@ -1880,7 +1896,7 @@ function LobbyInner() {
                   margin: "4px 0 12px 0",
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
                   padding: "12px 0",
-                  background: "var(--stage-2, #2A2135)",
+                  background: "var(--surface)",
                   border: `1px solid ${ON_STAGE_HAIRLINE}`,
                   borderRadius: 18,
                   backdropFilter: "blur(12px)",
@@ -1960,7 +1976,7 @@ function LobbyInner() {
                         minWidth: 18, height: 18, padding: "0 4px", borderRadius: 999,
                         background: "var(--coral)", color: "#fff",
                         fontSize: 12, fontWeight: 700, lineHeight: "18px", textAlign: "center" as const,
-                        border: "1.5px solid var(--stage, #1B1420)",
+                        border: "1.5px solid var(--surface)",
                       }}>{unread > 9 ? "9+" : unread}</span>
                     )}
                   </button>
@@ -2049,7 +2065,7 @@ function LobbyInner() {
                   ) : (
                     <div style={{
                       flex: 1, minHeight: 0,
-                      background: "var(--stage-2, #2A2135)",
+                      background: "var(--surface)",
                       border: `1px solid ${ON_STAGE_HAIRLINE}`,
                       borderRadius: 16,
                       overflow: "hidden",
