@@ -125,6 +125,16 @@ function useScrubProgress(enabled: boolean) {
   return { ref, p };
 }
 
+// Social-proof counts read better rounded down to a clean figure with a "+"
+// (e.g. 469 → "400+") than as an exact, seed-looking number.
+function socialFloor(n: number): number {
+  if (n >= 1000) return Math.floor(n / 500) * 500;
+  if (n >= 100) return Math.floor(n / 100) * 100;
+  if (n >= 20) return Math.floor(n / 10) * 10;
+  return Math.max(0, n);
+}
+const socialPlus = (n: number): string => (n >= 20 ? "+" : "");
+
 function CountUp({ value, duration = 1600 }: { value: number; duration?: number }) {
   const { ref, shown } = useReveal<HTMLSpanElement>();
   const [n, setN] = useState(0);
@@ -491,7 +501,7 @@ export default function LandingPage() {
                         Squads forming now
                       </span>
                       <span style={{ fontSize: 13, color: C.muted, fontFamily: BODY }}>
-                        {stats ? <><CountUp value={stats.playersOnline} /> people on Giggle</> : "Join people meeting their next crew"}
+                        {stats ? <><CountUp value={socialFloor(stats.playersOnline)} />{socialPlus(stats.playersOnline)} people on Giggle</> : "Join people meeting their next crew"}
                       </span>
                     </div>
                   </div>
@@ -619,7 +629,7 @@ export default function LandingPage() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "repeat(3,1fr)", gap: 0 }}>
                 <Stat value={stats?.squadsTotal} failed={statsFailed} label="squads formed" color={C.violet} divider={!isPhone} isPhone={isPhone} />
-                <Stat value={stats?.playersOnline} failed={statsFailed} label="people on Giggle" color={C.teal} divider={!isPhone} isPhone={isPhone} />
+                <Stat value={stats != null ? socialFloor(stats.playersOnline) : undefined} suffix={stats != null ? socialPlus(stats.playersOnline) : ""} failed={statsFailed} label="people on Giggle" color={C.teal} divider={!isPhone} isPhone={isPhone} />
                 <Stat value={stats?.encountersTotal} failed={statsFailed} label="encounters and counting" color={C.lime} isPhone={isPhone} />
               </div>
             </Reveal>
@@ -899,7 +909,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return <span style={{ display: "inline-block", fontSize: 12.5, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: C.violet, fontFamily: DISPLAY }}>{children}</span>;
 }
 
-function Stat({ value, failed, label, color, divider, isPhone }: { value?: number; failed?: boolean; label: string; color: string; divider?: boolean; isPhone?: boolean }) {
+function Stat({ value, failed, label, color, divider, isPhone, suffix }: { value?: number; failed?: boolean; label: string; color: string; divider?: boolean; isPhone?: boolean; suffix?: string }) {
   return (
     <div style={{
       textAlign: "center",
@@ -909,7 +919,7 @@ function Stat({ value, failed, label, color, divider, isPhone }: { value?: numbe
     }}>
       <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: isPhone ? 56 : 72, lineHeight: 1, color, letterSpacing: "-.04em", textShadow: `0 0 44px ${color}55`, display: "flex", justifyContent: "center" }}>
         {value != null
-          ? <CountUp value={value} />
+          ? <><CountUp value={value} />{suffix}</>
           : failed
             ? <span aria-label="unavailable">—</span>
             : <span className="gg-shimmer" aria-hidden style={{ display: "inline-block", width: isPhone ? 120 : 160, height: isPhone ? 56 : 72, borderRadius: 14 }} />}
