@@ -492,7 +492,7 @@ export default function ProfilePage() {
           {vibePickerOpen && (
             <div className="gg-toast" style={{ marginTop: 16, padding: 16, background: "var(--overlay)", borderRadius: "var(--radius-control, 14px)", border: "var(--control-border, 1px solid var(--border))" }}>
               <div style={{ color: textMuted, fontSize: 12, marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
-                <span>Pick vibes to add</span>
+                <span>Pick vibes to add · {vibes.length}/{MAX_PROFILE_VIBES}</span>
                 <button onClick={() => setVibePickerOpen(false)} aria-label="Close vibe picker" style={{ minWidth: 44, minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", color: textMuted, cursor: "pointer" }}>
                   <Icon.close size={14} color={textMuted} />
                 </button>
@@ -501,21 +501,28 @@ export default function ProfilePage() {
                 {CURATED_VIBES.map(vibe => {
                   const active = vibes.some(v => v.replace(/^[^\w]+/, "").trim() === vibe || v === vibe);
                   const hovered = vibeChipHover === vibe;
+                  // Once at the cap, only already-selected chips (which remove)
+                  // stay interactive; adding more is disabled rather than a
+                  // silent no-op that truncates the just-clicked vibe.
+                  const disabled = !active && vibes.length >= MAX_PROFILE_VIBES;
                   return (
                     <button
                       key={vibe}
+                      disabled={disabled}
                       onClick={() => active ? removeVibe(vibe) : addCuratedVibe(vibe)}
-                      onMouseEnter={() => setVibeChipHover(vibe)}
+                      onMouseEnter={() => !disabled && setVibeChipHover(vibe)}
                       onMouseLeave={() => setVibeChipHover(null)}
                       className="gg-press"
+                      title={disabled ? `You can pick up to ${MAX_PROFILE_VIBES} vibes` : undefined}
                       style={{
                         borderRadius: 999, padding: "0 14px", minHeight: 44, fontSize: 13, fontWeight: 500,
-                        border: `1.5px solid ${active || hovered ? violet : "var(--border-strong)"}`,
-                        background: active ? "color-mix(in srgb, var(--accent, var(--violet)) 20%, transparent)" : hovered ? "color-mix(in srgb, var(--accent, var(--violet)) 10%, transparent)" : "var(--overlay)",
-                        color: active || hovered ? violet : textMuted,
-                        cursor: "pointer", transition: "all .15s ease",
-                        transform: hovered && !active ? "translateY(-1px)" : "translateY(0)",
-                        boxShadow: hovered ? "0 0 12px -4px color-mix(in srgb, var(--accent, var(--violet)) 40%, transparent)" : "none",
+                        border: `1.5px solid ${active || (hovered && !disabled) ? violet : "var(--border-strong)"}`,
+                        background: active ? "color-mix(in srgb, var(--accent, var(--violet)) 20%, transparent)" : (hovered && !disabled) ? "color-mix(in srgb, var(--accent, var(--violet)) 10%, transparent)" : "var(--overlay)",
+                        color: active || (hovered && !disabled) ? violet : textMuted,
+                        cursor: disabled ? "not-allowed" : "pointer", transition: "all .15s ease",
+                        opacity: disabled ? 0.4 : 1,
+                        transform: hovered && !active && !disabled ? "translateY(-1px)" : "translateY(0)",
+                        boxShadow: hovered && !disabled ? "0 0 12px -4px color-mix(in srgb, var(--accent, var(--violet)) 40%, transparent)" : "none",
                       }}
                     >
                       {vibe}

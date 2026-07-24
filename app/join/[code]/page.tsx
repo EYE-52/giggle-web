@@ -5,12 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { session, api, formatSquadCodeInput, isValidSquadCode } from "@giggle/core";
 import { Logomark } from "@/components/Brand";
+import { AgeGate } from "@/components/AgeGate";
 
 // Invite-link landing: /join/<CODE>. Someone opens a squad invite link →
 // we join them to the squad and drop them straight into the lobby. If they're
 // not signed in, we bounce through /signin (preserving this URL via ?next=) and
 // come right back here after auth to complete the join.
-type Phase = "working" | "requested" | "error";
+type Phase = "working" | "age" | "requested" | "error";
 
 export default function JoinByLinkPage() {
   const router = useRouter();
@@ -20,6 +21,8 @@ export default function JoinByLinkPage() {
 
   const [phase, setPhase] = useState<Phase>("working");
   const [errorMsg, setErrorMsg] = useState("Something went wrong joining that squad.");
+  // Bumped after the age gate is satisfied to re-run the join effect.
+  const [proceed, setProceed] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +42,15 @@ export default function JoinByLinkPage() {
           router.replace(`/signin?next=${encodeURIComponent(`/join/${code}`)}`);
           return;
         }
+      }
+
+      // Age gate BEFORE the join — this route lives outside the (app) layout, so
+      // its AgeGate never runs here. Without this a not-yet-confirmed (possibly
+      // under-13) user would be added to the squad server-side before ever being
+      // asked their age.
+      if (!session.ageConfirmed) {
+        if (!cancelled) setPhase("age");
+        return;
       }
 
       try {
@@ -61,7 +73,19 @@ export default function JoinByLinkPage() {
 
     run();
     return () => { cancelled = true; };
-  }, [code, router]);
+  }, [code, router, proceed]);
+
+  if (phase === "age") {
+    return (
+      <AgeGate
+        onDone={() => {
+          // Age confirmed → re-run the effect, which now passes the gate and joins.
+          setPhase("working");
+          setProceed((n) => n + 1);
+        }}
+      />
+    );
+  }
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", display: "grid", placeItems: "center", padding: 24 }}>

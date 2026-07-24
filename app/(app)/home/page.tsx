@@ -363,13 +363,17 @@ export default function HomePage() {
                 const spots = Math.max(0, sq.maxSlots - sq.memberCount);
                 const rowJoining = joiningId === sq.squadId;
                 const isMember = mySquadIdSet.has(sq.squadId);
-                const activateRow = () => isMember ? router.push(`/lobby?squad=${sq.squadId}`) : handleJoinTrending(sq);
+                // A join elsewhere is in flight: handleJoinTrending will refuse
+                // (single-flight), so non-member rows must not look clickable.
+                // Member rows just navigate, so they stay active.
+                const blocked = !isMember && !!joiningId;
+                const activateRow = () => { if (blocked) return; isMember ? router.push(`/lobby?squad=${sq.squadId}`) : handleJoinTrending(sq); };
                 return (
-                  <div key={sq.squadId} onClick={activateRow} role="button" tabIndex={rowJoining ? -1 : 0}
-                    aria-disabled={rowJoining || undefined}
+                  <div key={sq.squadId} onClick={activateRow} role="button" tabIndex={blocked ? -1 : 0}
+                    aria-disabled={blocked || undefined}
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activateRow(); } }}
                     className="gg-focusable"
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderTop: "1px solid var(--border)", cursor: rowJoining ? "default" : "pointer", pointerEvents: rowJoining ? "none" : undefined, opacity: rowJoining ? 0.6 : 1, background: openHoveredId === `signal-${sq.squadId}` ? "var(--surface-2)" : "transparent", transition: "background .18s var(--ease-ui), opacity .2s var(--ease-ui)" }}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderTop: "1px solid var(--border)", cursor: blocked ? "default" : "pointer", pointerEvents: blocked ? "none" : undefined, opacity: rowJoining ? 0.6 : (blocked ? 0.75 : 1), background: openHoveredId === `signal-${sq.squadId}` ? "var(--surface-2)" : "transparent", transition: "background .18s var(--ease-ui), opacity .2s var(--ease-ui)" }}
                     onMouseEnter={() => setOpenHoveredId(`signal-${sq.squadId}`)}
                     onMouseLeave={() => setOpenHoveredId(null)}>
                     <span style={{ width: 38, height: 38, borderRadius: RADIUS_CONTROL, flexShrink: 0, background: coverBackground(sq.coverImage, coverKind(sq.coverImage, themeId)), filter: coverKind(sq.coverImage, themeId) === "dark" ? "saturate(0.8) brightness(0.85)" : undefined, boxShadow: "inset 0 0 0 1px var(--border)" }} />

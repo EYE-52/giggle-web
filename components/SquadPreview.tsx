@@ -126,6 +126,10 @@ export function SquadPreview({
   // Am I already in this squad? Then Join makes no sense — offer Open + Leave.
   const myUserId = session.user?.id;
   const isMember = !!myUserId && members.some(m => m.userId === myUserId);
+  // Until the roster resolves we can't know if the viewer is already a member,
+  // so don't offer "Join" yet — otherwise a member who clicks fast (or whose
+  // fetch is slow) would fire joinSquad on their own squad.
+  const detailLoading = detail === null && !detailError;
   const [leaving, setLeaving] = useState(false);
 
   const openLobby = useCallback(() => {
@@ -418,13 +422,13 @@ export function SquadPreview({
               ) : (
               <button
                 onClick={handleJoin}
-                disabled={joining || isFull}
+                disabled={joining || isFull || detailLoading}
                 onMouseEnter={() => setBtnHover(true)}
                 onMouseLeave={() => setBtnHover(false)}
                 className="gg-press"
                 style={{
                   width: "100%", height: 50, borderRadius: 999, border: "none",
-                  cursor: joining || isFull ? "not-allowed" : "pointer",
+                  cursor: joining || isFull || detailLoading ? "not-allowed" : "pointer",
                   background: isFull ? "var(--overlay)" : (btnHover ? "var(--violet-bright)" : "var(--violet)"),
                   color: isFull ? "var(--text-muted)" : "var(--on-accent)",
                   fontFamily: "var(--font-space-grotesk)", fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em",
@@ -437,9 +441,11 @@ export function SquadPreview({
               >
                 {isFull
                   ? "Squad full"
-                  : joining
-                    ? (<><span className="gg-spinner" /> {isRequest ? "Sending request…" : "Joining…"}</>)
-                    : (<><Icon.enter size={16} color="var(--on-accent)" /> {isRequest ? "Request to join" : "Join squad"}</>)}
+                  : detailLoading
+                    ? (<><span className="gg-spinner" /> Loading…</>)
+                    : joining
+                      ? (<><span className="gg-spinner" /> {isRequest ? "Sending request…" : "Joining…"}</>)
+                      : (<><Icon.enter size={16} color="var(--on-accent)" /> {isRequest ? "Request to join" : "Join squad"}</>)}
               </button>
               )}
             </>

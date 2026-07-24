@@ -322,8 +322,12 @@ function LobbyInner() {
     if (pollFailsRef.current >= 2) setConnTrouble(true);
   }
 
-  async function enableLobbyMedia() {
-    if (!squadId || videoJoined || videoJoining) return;
+  // Returns true only if the camera/mic actually joined — callers that gate a
+  // follow-up action (e.g. the "Enable camera" match flow) must not proceed on
+  // a swallowed failure.
+  async function enableLobbyMedia(): Promise<boolean> {
+    if (!squadId || videoJoining) return videoJoined;
+    if (videoJoined) return true;
     setVideoJoining(true);
     setVideoError(null);
     try {
@@ -333,10 +337,12 @@ function LobbyInner() {
       await vc.join(tokenData, { audio: true, video: true });
       await api.setLobbyVideo(squadId, true);
       setVideoJoined(true);
+      return true;
     } catch (e) {
       await vcRef.current?.leave().catch(() => {});
       vcRef.current = null;
       setVideoError(describeVideoError(e));
+      return false;
     } finally {
       setVideoJoining(false);
     }
@@ -576,9 +582,14 @@ function LobbyInner() {
 
   async function handleFindMatch() {
     if (!squadId) return;
-    const everyoneReady = !!squad?.members.length && squad.members.every(member => member.ready);
+    // Only members who are actually connected gate the match. An offline member
+    // who never marked ready must not permanently trap the leader (mirrors the
+    // server's online-only ready-check). online === false means offline;
+    // true/undefined counts as online.
+    const activeMembers = (squad?.members ?? []).filter(m => m.online !== false);
+    const everyoneReady = activeMembers.length > 0 && activeMembers.every(member => member.ready);
     if (!everyoneReady) {
-      setMatchError("Everyone needs to be ready before you find a match.");
+      setMatchError("Everyone online needs to be ready before you find a match.");
       return;
     }
     // Camera priming: if lobby media was never enabled, confirm before entering
@@ -790,10 +801,15 @@ function LobbyInner() {
   const effCols = isPhone ? Math.min(gridCols, 2) : gridCols;
   const effRows = Math.ceil(tileCount / effCols);
 
-  const allReady = memberCount > 0 && readyCount === memberCount;
+  // Match readiness is gated on ONLINE members only — an offline member who
+  // never marked ready must not block the leader (mirrors the server check).
+  const onlineMembers = (squad?.members ?? []).filter(m => m.online !== false);
+  const onlineReadyCount = onlineMembers.filter(m => m.ready).length;
+  const allReady = onlineMembers.length > 0 && onlineReadyCount === onlineMembers.length;
   const myReady = !!myMember?.ready;
-  // Who's holding up the match — for the "waiting on…" helper under Find a Match.
-  const notReadyNames = (squad?.members ?? []).filter(m => !m.ready).map(m => m.displayName);
+  // Who's holding up the match — only online members can act, so offline ones
+  // (who can't respond) never appear in the "waiting on…" helper.
+  const notReadyNames = onlineMembers.filter(m => !m.ready).map(m => m.displayName);
   const notReadyLabel = notReadyNames.length <= 2
     ? notReadyNames.join(", ")
     : `${notReadyNames.slice(0, 2).join(", ")} +${notReadyNames.length - 2}`;
@@ -1915,7 +1931,7 @@ function LobbyInner() {
               )}
             </div>
             {/* Why Find-a-Match is disabled — names of who we're waiting on */}
-            {isLeader && !allReady && memberCount > 0 && (
+            {isLeader && !allReady && onlineMembers.length > 0 && (
               <div role="status" aria-live="polite" style={{
                 alignSelf: "center",
                 marginTop: 8,
@@ -1927,7 +1943,7 @@ function LobbyInner() {
                 position: "relative" as const,
                 zIndex: 1,
               }}>
-                {readyCount} of {memberCount} ready{notReadyNames.length > 0 ? ` — waiting on ${notReadyLabel}` : ""}
+                {onlineReadyCount} of {onlineMembers.length} ready{notReadyNames.length > 0 ? ` — waiting on ${notReadyLabel}` : ""}
               </div>
             )}
             {matchError && (
@@ -2224,16 +2240,33 @@ function LobbyInner() {
           width={400}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {videoError && (
+              <div role="alert" style={{
+                fontSize: 13,
+                lineHeight: 1.4,
+                color: "var(--danger)",
+                background: "var(--danger-soft, rgba(255,90,90,0.12))",
+                border: "1px solid var(--danger)",
+                borderRadius: 10,
+                padding: "8px 10px",
+              }}>
+                {videoError}
+              </div>
+            )}
             <Button
               fullWidth
               loading={noCamEnabling || findingMatch}
               onClick={async () => {
                 setNoCamEnabling(true);
+                let ok = false;
                 try {
-                  await enableLobbyMedia();
+                  ok = await enableLobbyMedia();
                 } finally {
                   setNoCamEnabling(false);
                 }
+                // Camera failed to enable — keep the modal open so the user
+                // sees the error and can retry or explicitly continue without.
+                if (!ok) return;
                 setNoCamConfirmOpen(false);
                 await proceedFindMatch();
               }}

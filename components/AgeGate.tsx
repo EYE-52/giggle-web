@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Logomark } from "@/components/Brand";
 import { Button } from "@/components/Button";
 import { session } from "@giggle/core";
@@ -97,11 +97,28 @@ export function AgeGate({ onDone }: { onDone: () => void }) {
     () => Array.from({ length: 108 }, (_, i) => currentYear - 13 - i),
     [currentYear],
   );
-  const days = useMemo(() => Array.from({ length: 31 }, (_, i) => i + 1), []);
-
   const [month, setMonth] = useState<string>("");
   const [day, setDay] = useState<string>("");
   const [year, setYear] = useState<string>("");
+
+  // Days available depend on the chosen month (and year, for February). Before a
+  // year is picked we assume a leap year (2000) so Feb 29 stays selectable; an
+  // impossible Feb 29 on a non-leap birth year is still caught at submit.
+  const daysInMonth = useMemo(() => {
+    if (month === "") return 31;
+    const y = year === "" ? 2000 : Number(year);
+    return new Date(y, Number(month) + 1, 0).getDate();
+  }, [month, year]);
+  const days = useMemo(
+    () => Array.from({ length: daysInMonth }, (_, i) => i + 1),
+    [daysInMonth],
+  );
+
+  // If the selected day no longer exists in the newly-chosen month, clear it so
+  // the user must re-pick rather than silently submitting an impossible date.
+  useEffect(() => {
+    if (day !== "" && Number(day) > daysInMonth) setDay("");
+  }, [daysInMonth, day]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tooYoung, setTooYoung] = useState(false);
